@@ -1,0 +1,9 @@
+
+*
+!*/
+
+!source/**
+!thirdparty/**
+!.gitignore
+!build.py
+!imgui.ini
