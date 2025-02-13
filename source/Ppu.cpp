@@ -10,7 +10,7 @@
 #include "Ppu/GlobalPalette.h"
 #include "Ppu/PaletteRam.h"
 #include "Ppu/SpriteRam.h"
-#include "Ppu/TestChrRom.h"
+#include "Cart.h"
 
 namespace Ppu {
 	bool frameDone;
@@ -22,6 +22,7 @@ namespace Ppu {
 	// Colour and depth buffers for the frame
 	Rgb colourBuf[256 * 240];
 	U8 depthBuf[256 * 240];
+	U8 sprite0Buf[256 * 240];
 	
 	U32 frame;
 	
@@ -31,6 +32,9 @@ namespace Ppu {
 	bool vblank;
 	// Sprite 0 hit flag
 	bool sprite0;
+	
+	// The column and row where the sprite0 flag will be set
+	U16 sprite0Col, sprite0Row;
 	
 	// Externally-controlled settings
 	
@@ -57,8 +61,10 @@ namespace Ppu {
 		// Whether the next write to either the scroll or addr register
 		// is the second one
 		bool secondWrite;
+		// Background base nametable
+		U8 baseNtX, baseNtY;
 		// Background scroll
-		U16 scrollX, scrollY;
+		U8 scrollX, scrollY;
 		// Pointer into PPU memory for the data register
 		U16 ppuAddr;
 		// Whether to increment ppuAddr by 32 when the data register is accessed
@@ -77,6 +83,7 @@ namespace Ppu {
 		} else {
 			ppuAddr++;
 		}
+		ppuAddr &= 0x7fff;
 	}
 	
 	// Registers accessable through
@@ -103,7 +110,7 @@ namespace Ppu {
 			auto r = readBuf;
 			
 			if (ppuAddr <= 0x1fff) {
-				readBuf = testChrRom[ppuAddr % 0x1000];
+				readBuf = Cart::ppuRead(ppuAddr);
 			} else if (ppuAddr <= 0x2fff) {
 				readBuf = CiRam::read(ppuAddr - 0x2000);
 			}
@@ -116,8 +123,8 @@ namespace Ppu {
 	
 	void write(U16 addr, U8 data) {
 		if (addr == regCtrl) {
-			scrollX = (scrollX & ~0xff) | ((data & 1) << 8);
-			scrollY = (scrollY & ~0xff) | ((data & 2) << 7);
+			baseNtX = data & 1;
+			baseNtY = (data >> 1) & 1;
 			ppuAddrInc32 = (data >> 2) & 1;
 			spritesPtIdx = (data >> 3) & 1;
 			bgPtIdx = (data >> 4) & 1;
@@ -140,21 +147,24 @@ namespace Ppu {
 		} else if (addr == regScroll) {
 			ppuAddr = 0;
 			if (!secondWrite) {
-				scrollX = (scrollX & ~0xff) | data;
+				scrollX = data;
 			} else {
-				scrollY = (scrollY & ~0xff) | data;
+				scrollY = data;
 			}
 			secondWrite ^= 1;
 			reRender = true;
 		} else if (addr == regAddr) {
 			scrollX = 0;
 			scrollY = 0;
+			baseNtX = 0;
+			baseNtY = 0;
 			if (!secondWrite) {
-				ppuAddr = data;
+				ppuAddr = (data << 8) & 0x7fff;
 			} else {
-				ppuAddr |= data << 8;
+				ppuAddr |= data;
 			}
 			secondWrite ^= 1;
+			reRender = true;
 		} else if (addr == regData) {
 			if (ppuAddr >= 0x2000 && ppuAddr <= 0x2fff) {
 				CiRam::write(ppuAddr - 0x2000, data);
@@ -176,12 +186,14 @@ namespace Ppu {
 			// Height (pixels)
 			auto h = bigSprites? 16 : 8;
 			
-			auto palette = PaletteRam::palette(sprite.paletteIdx, greyscale);
+			auto palette = PaletteRam::palette(4 + sprite.paletteIdx, greyscale);
 			
-			auto depth = sprite.priority? 2 : 1;
+			auto depth = sprite.priority? 1 : 2;
 			
 			// For every pixel of the sprite
 			for (auto ySprite = 0; ySprite < h; ySprite++) {
+				auto eYSprite = sprite.flipY? (h - 1 - ySprite) : ySprite;
+				
 				// Pixel Y position on the screen
 				auto yS = sprite.y + ySprite + 1;
 				
@@ -190,9 +202,10 @@ namespace Ppu {
 					break;
 				}
 				
+				auto ptIdx = spritesPtIdx;
 				auto patternIdx = sprite.patternIdx;
 				if (bigSprites) {
-					// TODO: use pattern table selection bit
+					ptIdx = patternIdx & 1;
 					patternIdx &= ~1;
 					if (ySprite >= 8) {
 						// Use next pattern if on the bottom half
@@ -202,8 +215,8 @@ namespace Ppu {
 				}
 				
 				// Pattern's low and high bytes
-				auto patternLo = testChrRom[16 * patternIdx + (ySprite % 8)];
-				auto patternHi = testChrRom[16 * patternIdx + 8 + (ySprite % 8)];
+				auto patternLo = Cart::ppuRead((0x1000 * ptIdx) + (16 * patternIdx) + (eYSprite % 8));
+				auto patternHi = Cart::ppuRead((0x1000 * ptIdx) + (16 * patternIdx) + 8 + (eYSprite % 8));
 				
 				for (
 					auto xSprite = 0,
@@ -225,10 +238,14 @@ namespace Ppu {
 						continue;
 					}
 					
-					auto peIdxHi = (patternHi >> iXSprite) & 1;
-					auto peIdxLo = (patternLo >> iXSprite) & 1;
+					auto peIdxHi = (patternHi >> (sprite.flipX? xSprite : iXSprite)) & 1;
+					auto peIdxLo = (patternLo >> (sprite.flipX? xSprite : iXSprite)) & 1;
 					// Palette entry index
 					auto peIdx = (2 * peIdxHi) + peIdxLo;
+					
+					if (i == 0 && peIdx != 0) {
+						sprite0Buf[idxS] = 0xff;
+					}
 					
 					// Discard if palette entry index is 0 (transparent)
 					// or depth at pixel is >= this sprite's depth
@@ -246,10 +263,13 @@ namespace Ppu {
 	// Render background to the colour buffer,
 	// starting at the current row (nRow)
 	void renderBg() {
+		auto eScrollX = (256 * baseNtX) + scrollX;
+		auto eScrollY = (240 * baseNtY) + scrollY;
+		
 		// Iterate over every tile to be rendered
 		// x0 and y0 are the pixel position of the top-left-most visible pixel
-		for (auto y0 = scrollY + nRow; y0 < scrollY + 240; y0 = ((y0 / 8) + 1) * 8) {
-			for (auto x0 = scrollX + (bgVisibleLeft? 0 : 8); x0 < scrollX + 256; x0 = ((x0 / 8) + 1) * 8) {
+		for (auto y0 = eScrollY + nRow; y0 < eScrollY + 240; y0 = ((y0 / 8) + 1) * 8) {
+			for (auto x0 = eScrollX + (bgVisibleLeft? 0 : 8); x0 < eScrollX + 256; x0 = ((x0 / 8) + 1) * 8) {
 				auto ntX = (x0 / 256) % 2;
 				auto ntY = (y0 / 240) % 2;
 				// Name table's index
@@ -287,17 +307,17 @@ namespace Ppu {
 					// Y position in the tile
 					auto yTile = y % 8;
 					// Y position on the screen
-					auto yS = y - scrollY;
+					auto yS = y - eScrollY;
 					
 					// Pattern's low and high bytes
-					auto patternLo = testChrRom[16 * patternIdx + yTile];
-					auto patternHi = testChrRom[16 * patternIdx + 8 + yTile];
+					auto patternLo = Cart::ppuRead((0x1000 * bgPtIdx) + (16 * patternIdx) + yTile);
+					auto patternHi = Cart::ppuRead((0x1000 * bgPtIdx) + (16 * patternIdx) + 8 + yTile);
 					
 					auto x = x0; do {
 						// X position in the tile
 						auto xTile = x % 8;
 						// X position on the screen
-						auto xS = x - scrollX;
+						auto xS = x - eScrollX;
 						
 						// Index on the screen
 						auto idxS = (256 * yS) + xS;
@@ -307,6 +327,13 @@ namespace Ppu {
 						auto peIdxLo = (patternLo >> iXTile) & 1;
 						// Palette entry index
 						auto peIdx = (2 * peIdxHi) + peIdxLo;
+						
+						if (peIdx != 0 && sprite0Buf[idxS] != 0 &&
+							(nRow < sprite0Row || (nRow == sprite0Row && nCol < sprite0Col))
+						) {
+							sprite0Col = xS;
+							sprite0Row = yS;
+						}
 						
 						// Discard if palette entry index is 0 (transparent)
 						// or depth at pixel is >= 2
@@ -318,19 +345,22 @@ namespace Ppu {
 						}
 						
 						x++;
-					} while (x < scrollX + 256 && x % 8 != 0);
+					} while (x < eScrollX + 256 && x % 8 != 0);
 					y++;
-				} while (y < scrollY + 240 && y % 8 != 0);
+				} while (y < eScrollY + 240 && y % 8 != 0);
 			}
 		}
 	}
 	
 	void tick() {
-		if (reRender && nCol == 0) {
+		auto blanking = nRow >= 240 || (!spritesVisible && !bgVisible);
+		
+		if (reRender && nCol == 0 && !blanking) {
 			reRender = false;
 			
-			// Clear the depth buffer
+			// Clear the depth and sprite0 buffers
 			memset(depthBuf + (256 * nRow), 0, (256 * (240 - nRow)) * sizeof(depthBuf[0]));
+			memset(sprite0Buf + (256 * nRow), 0, (256 * (240 - nRow)) * sizeof(sprite0Buf[0]));
 			
 			// Clear the colour buffer
 			auto clearColour = GlobalPalette::colour(PaletteRam::clearColour(greyscale), emphasis);
@@ -343,6 +373,10 @@ namespace Ppu {
 			if (bgVisible) { renderBg(); }
 		}
 		
+		if (nCol == sprite0Col && nRow == sprite0Row) {
+			sprite0 = 1;
+		}
+		
 		nCol++;
 		if (nCol == 341) {
 			nCol = 0;
@@ -353,6 +387,7 @@ namespace Ppu {
 				
 				glBindTexture(GL_TEXTURE_2D, frame);
 				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 240, 0, GL_RGB, GL_UNSIGNED_BYTE, colourBuf);
+				//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 240, 0, GL_RED, GL_UNSIGNED_BYTE, sprite0Buf);
 				
 				vblank = true;
 				if (nmiOnVblank) {
@@ -368,6 +403,9 @@ namespace Ppu {
 				
 				vblank = false;
 				sprite0 = false;
+				
+				sprite0Col = 0xffff;
+				sprite0Row = 0xffff;
 			}
 		}
 	}
@@ -386,6 +424,7 @@ namespace Ppu {
 		
 		memset(colourBuf, 0, sizeof(colourBuf));
 		memset(depthBuf, 0, sizeof(depthBuf));
+		memset(sprite0Buf, 0, sizeof(sprite0Buf));
 		
 		glGenTextures(1, &frame);
 		glBindTexture(GL_TEXTURE_2D, frame);
@@ -396,19 +435,22 @@ namespace Ppu {
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 240, 0, GL_RGB, GL_UNSIGNED_BYTE, colourBuf);
 		
 		nmi = false;
-	
+		
 		vblank = false;
 		sprite0 = false;
 		
+		sprite0Col = 0xffff;
+		sprite0Row = 0xffff;
+		
 		nmiOnVblank = false;
 		
-		spritesVisible = true;
-		spritesVisibleLeft = true;
+		spritesVisible = false;
+		spritesVisibleLeft = false;
 		spritesPtIdx = 0;
 		bigSprites = false;
 		
-		bgVisible = true;
-		bgVisibleLeft = true;
+		bgVisible = false;
+		bgVisibleLeft = false;
 		bgPtIdx = 0;
 		
 		greyscale = false;

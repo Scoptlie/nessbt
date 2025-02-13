@@ -2,7 +2,7 @@
 
 #include <cstring>
 
-#define mirrorV true
+#include "Cart.h"
 
 namespace Ppu::CiRam {
 	U8 content[0x800];
@@ -11,7 +11,7 @@ namespace Ppu::CiRam {
 		auto low = addr & 0b1111111111;
 		
 		auto high = addr;
-		if (mirrorV) {
+		if (!Cart::mirrorV) {
 			high >>= 1;
 		}
 		high &= 0b10000000000;
@@ -29,13 +29,6 @@ namespace Ppu::CiRam {
 	
 	void init() {
 		memset(content, 0, sizeof(content));
-		
-		content[33] = 'H';
-		content[34] = 'e';
-		content[35] = 'l';
-		content[36] = 'l';
-		content[37] = 'o';
-		content[38] = '!';
 	}
 	
 	void deinit() {

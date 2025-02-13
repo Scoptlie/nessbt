@@ -42,11 +42,6 @@ namespace Ppu::PaletteRam {
 	
 	void init() {
 		memset(content, 0, sizeof(content));
-		
-		content[0] = 0x12;
-		content[1] = 0x24;
-		content[2] = 0x20;
-		content[3] = 0x30;
 	}
 	
 	void deinit() {

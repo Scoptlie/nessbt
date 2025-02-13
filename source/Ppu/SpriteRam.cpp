@@ -22,11 +22,6 @@ namespace Ppu::SpriteRam {
 	
 	void init() {
 		memset(content, 0, sizeof(content));
-		
-		content[0] = 32;
-		content[1] = 0x14;
-		content[2] = 0b00100000;
-		content[3] = 32;
 	}
 	
 	void deinit() {
