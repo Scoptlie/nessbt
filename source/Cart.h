@@ -1,14 +1,13 @@
 #pragma once
 
-#include "Common.h"
+#include "common.h"
 
 namespace Cart {
 	extern bool mirrorV;
 	
-	U8 cpuRead(U16 addr);
+	extern U16 prgRomSize, chrRomSize;
+	extern U8 *prgRom, *chrRom;
 	
-	U8 ppuRead(U16 addr);
-	
-	void init(char const *file);
+	void init(char const *romFile);
 	void deinit();
 }

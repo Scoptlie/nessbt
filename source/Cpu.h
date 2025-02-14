@@ -1,28 +1,28 @@
 #pragma once
 
-#include "Common.h"
+#include "common.h"
 
 namespace Cpu {
 	extern U8 ram[0x800];
 	
-	extern U64 nCycle;
+	extern USize nCycles;
 	
 	extern U8 n, v, d, i, z, c;
-	
-	U8 p(U8 b);
-	void setP(U8 p);
-	
-	extern U8 pcl, pch;
-	
-	U16 pc();
-	
+	extern U16 pc;
 	extern U8 spl;
-	extern U8 a;
-	extern U8 x, y;
+	extern U8 a, x, y;
 	
-	void reset();
-	void step();
+	U8 read(U16 addr);
+	U16 read16(U16 addr);
+	U16 read16Zpg(U8 addr);
+	void write(U16 addr, U8 data);
+	
+	void push(U8 data);
+	void push16(U16 data);
+	U8 pull();
+	U16 pull16();
+	
+	void emuInstr();
 	
 	void init();
-	void deinit();
-};
+}

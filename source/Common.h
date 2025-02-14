@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 using U8 = uint8_t;
@@ -13,23 +14,3 @@ using I16 = int16_t;
 using I32 = int32_t;
 using I64 = int64_t;
 using ISize = ptrdiff_t;
-
-using F32 = float;
-using F64 = double;
-
-template <typename FuncT>
-struct DeferT {
-	FuncT func;
-	
-	DeferT(FuncT func) :
-		func(func) { }
-	
-	~DeferT() { func(); }
-};
-
-#define concat2(a, b)\
-	a ## b
-#define concat(a, b)\
-	concat2(a, b)
-#define defer(expr)\
-	auto concat($deferred, __LINE__) = DeferT([&]() { (expr); })
