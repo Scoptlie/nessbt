@@ -8,6 +8,8 @@ namespace Cart {
 	extern U16 prgRomSize, chrRomSize;
 	extern U8 *prgRom, *chrRom;
 	
+	U8 cpuRead(U16 addr);
+	U8 ppuRead(U16 addr);
+	
 	void init(char const *romFile);
-	void deinit();
 }

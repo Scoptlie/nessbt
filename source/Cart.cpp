@@ -12,6 +12,14 @@ namespace Cart {
 	U16 prgRomSize, chrRomSize;
 	U8 *prgRom, *chrRom;
 	
+	U8 cpuRead(U16 addr) {
+		return prgRom[addr & (prgRomSize - 1)];
+	}
+	
+	U8 ppuRead(U16 addr) {
+		return chrRom[addr & (chrRomSize - 1)];
+	}
+	
 	void init(char const *romFile) {
 		auto s = fopen(romFile, "rb");
 		if (!s) {

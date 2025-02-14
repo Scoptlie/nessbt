@@ -22,6 +22,8 @@ namespace Cpu {
 	U8 pull();
 	U16 pull16();
 	
+	void handleInt();
+	
 	void emuInstr();
 	
 	void init();

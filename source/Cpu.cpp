@@ -2,6 +2,11 @@
 
 #include <cstring>
 
+#include "cart.h"
+#include "controller.h"
+#include "ppu.h"
+#include "ppu/spriteRam.h"
+
 namespace Cpu {
 	U8 ram[0x800];
 	
@@ -17,6 +22,7 @@ namespace Cpu {
 		return
 			(n << 7) |
 			(v << 6) |
+			(1 << 5) |
 			(b << 4) |
 			(d << 3) |
 			(i << 2) |
@@ -140,6 +146,12 @@ namespace Cpu {
 	U8 read(U16 addr) {
 		if (addr <= 0x1fff) {
 			return ram[addr];
+		} else if (addr <= 0x3fff) {
+			return Ppu::read(addr & 7);
+		} else if (addr == 0x4016) {
+			return Controller::data();
+		} else if (addr >= 0x8000) {
+			return Cart::cpuRead(addr & 0x7fff);
 		}
 		return 0;
 	}
@@ -149,7 +161,7 @@ namespace Cpu {
 	}
 	
 	U16 read16Zpg(U8 addr) {
-		return read(addr) | (read(U8(addr + 1) << 8));
+		return read(addr) | (read(U8(addr + 1)) << 8);
 	}
 	
 	U8 readImm() {
@@ -168,12 +180,12 @@ namespace Cpu {
 	}
 	
 	U8 readZpgX() {
-		auto ea = readImm() + x;
+		auto ea = U8(readImm() + x);
 		return read(ea);
 	}
 	
 	U8 readZpgY() {
-		auto ea = readImm() + y;
+		auto ea = U8(readImm() + y);
 		return read(ea);
 	}
 	
@@ -207,6 +219,15 @@ namespace Cpu {
 	void write(U16 addr, U8 data) {
 		if (addr <= 0x1fff) {
 			ram[addr] = data;
+		} else if (addr <= 0x3fff) {
+			Ppu::write(addr & 7, data);
+		} else if (addr == 0x4014) {
+			if (data < 8) {
+				memcpy(Ppu::SpriteRam::content, ram + (256 * data), 256);
+				nCycles += 512;
+			}
+		} else if (addr == 0x4016) {
+			Controller::strobe();
 		}
 	}
 	
@@ -216,12 +237,12 @@ namespace Cpu {
 	}
 	
 	void writeZpgX(U8 data) {
-		auto ea = readImm() + x;
+		auto ea = U8(readImm() + x);
 		write(ea, data);
 	}
 	
 	void writeZpgY(U8 data) {
-		auto ea = readImm() + y;
+		auto ea = U8(readImm() + y);
 		write(ea, data);
 	}
 	
@@ -262,12 +283,12 @@ namespace Cpu {
 	}
 	
 	void rmwZpgX(U8(*func)(U8)) {
-		auto ea = readImm() + x;
+		auto ea = U8(readImm() + x);
 		rmw(ea, func);
 	}
 	
 	void rmwZpgY(U8(*func)(U8)) {
-		auto ea = readImm() + y;
+		auto ea = U8(readImm() + y);
 		rmw(ea, func);
 	}
 	
@@ -313,7 +334,7 @@ namespace Cpu {
 	
 	U16 pull16() {
 		auto r = U16(pull());
-		r |= pull();
+		r |= pull() << 8;
 		return r;
 	}
 	
@@ -323,7 +344,8 @@ namespace Cpu {
 	
 	void jumpInd() {
 		auto ia = readImm16();
-		pc = read16(ia);
+		pc = read(ia);
+		pc |= read((ia & 0xff00) | ((ia + 1) & 0x00ff)) << 8;
 	}
 	
 	void jumpSub() {
@@ -336,7 +358,7 @@ namespace Cpu {
 		push16(pc + b);
 		push(p(b));
 		i = 1;
-		pc = read16(0xfffe);
+		pc = read16(Ppu::nmi? 0xfffa : 0xfffe);
 	}
 	
 	void retSub() {
@@ -357,9 +379,15 @@ namespace Cpu {
 		return false;
 	}
 	
+	void handleInt() {
+		if (Ppu::nmi) {
+			jumpInt(0);
+			nCycles += 7;
+			Ppu::nmi = false;
+		}
+	}
+	
 	void emuInstr() {
-		// TODO: handle interrupt
-		
 		auto opcode = readImm();
 		
 		switch (opcode) {
