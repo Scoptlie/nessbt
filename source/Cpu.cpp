@@ -389,299 +389,304 @@ namespace Cpu {
 	}
 	
 	void emuInstr() {
+		auto opcode = readImm();
 		
+		#define tailCallEmuInstr\
+			__attribute__((musttail)) return emuInstr()
+		#define tailCallEmuBBlock\
+			__attribute__((musttail)) return emuBBlock()
+		
+		switch (opcode) {
+		case 0x00: { jumpInt(1); nCycles += 7; tailCallEmuBBlock; }
+		case 0x01: { orA(readIndX()); nCycles += 6; tailCallEmuInstr; }
+		case 0x02: { nCycles += 2; tailCallEmuInstr; }
+		case 0x03: { nCycles += 2; tailCallEmuInstr; }
+		case 0x04: { nCycles += 2; tailCallEmuInstr; }
+		case 0x05: { orA(readZpg()); nCycles += 3; tailCallEmuInstr; }
+		case 0x06: { rmwZpg(shL); nCycles += 5; tailCallEmuInstr; }
+		case 0x07: { nCycles += 2; tailCallEmuInstr; }
+		case 0x08: { push(p(1)); nCycles += 3; tailCallEmuInstr; }
+		case 0x09: { orA(readImm()); nCycles += 2; tailCallEmuInstr; }
+		case 0x0a: { a = shL(a); nCycles += 2; tailCallEmuInstr; }
+		case 0x0b: { nCycles += 2; tailCallEmuInstr; }
+		case 0x0c: { nCycles += 2; tailCallEmuInstr; }
+		case 0x0d: { orA(readAbs()); nCycles += 4; tailCallEmuInstr; }
+		case 0x0e: { rmwAbs(shL); nCycles += 6; tailCallEmuInstr; }
+		case 0x0f: { nCycles += 2; tailCallEmuInstr; }
+		case 0x10: { nCycles += branch(!n)? 3: 2; tailCallEmuBBlock; }
+		case 0x11: { orA(readIndY()); nCycles += 5; tailCallEmuInstr; }
+		case 0x12: { nCycles += 2; tailCallEmuInstr; }
+		case 0x13: { nCycles += 2; tailCallEmuInstr; }
+		case 0x14: { nCycles += 2; tailCallEmuInstr; }
+		case 0x15: { orA(readZpgX()); nCycles += 4; tailCallEmuInstr; }
+		case 0x16: { rmwZpgX(shL); nCycles += 6; tailCallEmuInstr; }
+		case 0x17: { nCycles += 2; tailCallEmuInstr; }
+		case 0x18: { c = 0; nCycles += 2; tailCallEmuInstr; }
+		case 0x19: { orA(readAbsY()); nCycles += 4; tailCallEmuInstr; }
+		case 0x1a: { nCycles += 2; tailCallEmuInstr; }
+		case 0x1b: { nCycles += 2; tailCallEmuInstr; }
+		case 0x1c: { nCycles += 2; tailCallEmuInstr; }
+		case 0x1d: { orA(readAbsX()); nCycles += 4; tailCallEmuInstr; }
+		case 0x1e: { rmwAbsX(shL); nCycles += 7; tailCallEmuInstr; }
+		case 0x1f: { nCycles += 2; tailCallEmuInstr; }
+		case 0x20: { jumpSub(); nCycles += 6; tailCallEmuBBlock; }
+		case 0x21: { andA(readIndX()); nCycles += 6; tailCallEmuInstr; }
+		case 0x22: { nCycles += 2; tailCallEmuInstr; }
+		case 0x23: { nCycles += 2; tailCallEmuInstr; }
+		case 0x24: { bitA(readZpg()); nCycles += 3; tailCallEmuInstr; }
+		case 0x25: { andA(readZpg()); nCycles += 3; tailCallEmuInstr; }
+		case 0x26: { rmwZpg(roL); nCycles += 5; tailCallEmuInstr; }
+		case 0x27: { nCycles += 2; tailCallEmuInstr; }
+		case 0x28: { setP(pull()); nCycles += 4; tailCallEmuInstr; }
+		case 0x29: { andA(readImm()); nCycles += 2; tailCallEmuInstr; }
+		case 0x2a: { a = roL(a); nCycles += 2; tailCallEmuInstr; }
+		case 0x2b: { nCycles += 2; tailCallEmuInstr; }
+		case 0x2c: { bitA(readAbs()); nCycles += 4; tailCallEmuInstr; }
+		case 0x2d: { andA(readAbs()); nCycles += 4; tailCallEmuInstr; }
+		case 0x2e: { rmwAbs(roL); nCycles += 6; tailCallEmuInstr; }
+		case 0x2f: { nCycles += 2; tailCallEmuInstr; }
+		case 0x30: { nCycles += branch(n)? 3: 2; tailCallEmuBBlock; }
+		case 0x31: { andA(readIndY()); nCycles += 5; tailCallEmuInstr; }
+		case 0x32: { nCycles += 2; tailCallEmuInstr; }
+		case 0x33: { nCycles += 2; tailCallEmuInstr; }
+		case 0x34: { nCycles += 2; tailCallEmuInstr; }
+		case 0x35: { andA(readZpgX()); nCycles += 4; tailCallEmuInstr; }
+		case 0x36: { rmwZpgX(roL); nCycles += 6; tailCallEmuInstr; }
+		case 0x37: { nCycles += 2; tailCallEmuInstr; }
+		case 0x38: { c = 1; nCycles += 2; tailCallEmuInstr; }
+		case 0x39: { andA(readAbsY()); nCycles += 4; tailCallEmuInstr; }
+		case 0x3a: { nCycles += 2; tailCallEmuInstr; }
+		case 0x3b: { nCycles += 2; tailCallEmuInstr; }
+		case 0x3c: { nCycles += 2; tailCallEmuInstr; }
+		case 0x3d: { andA(readAbsX()); nCycles += 4; tailCallEmuInstr; }
+		case 0x3e: { rmwAbsX(roL); nCycles += 7; tailCallEmuInstr; }
+		case 0x3f: { nCycles += 2; tailCallEmuInstr; }
+		case 0x40: { retInt(); nCycles += 6; tailCallEmuBBlock; }
+		case 0x41: { eorA(readIndX()); nCycles += 6; tailCallEmuInstr; }
+		case 0x42: { nCycles += 2; tailCallEmuInstr; }
+		case 0x43: { nCycles += 2; tailCallEmuInstr; }
+		case 0x44: { nCycles += 2; tailCallEmuInstr; }
+		case 0x45: { eorA(readZpg()); nCycles += 3; tailCallEmuInstr; }
+		case 0x46: { rmwZpg(shR); nCycles += 5; tailCallEmuInstr; }
+		case 0x47: { nCycles += 2; tailCallEmuInstr; }
+		case 0x48: { push(a); nCycles += 3; tailCallEmuInstr; }
+		case 0x49: { eorA(readImm()); nCycles += 2; tailCallEmuInstr; }
+		case 0x4a: { a = shR(a); nCycles += 2; tailCallEmuInstr; }
+		case 0x4b: { nCycles += 2; tailCallEmuInstr; }
+		case 0x4c: { jumpAbs(); nCycles += 3; tailCallEmuBBlock; }
+		case 0x4d: { eorA(readAbs()); nCycles += 4; tailCallEmuInstr; }
+		case 0x4e: { rmwAbs(shR); nCycles += 6; tailCallEmuInstr; }
+		case 0x4f: { nCycles += 2; tailCallEmuInstr; }
+		case 0x50: { nCycles += branch(!v)? 3: 2; tailCallEmuBBlock; }
+		case 0x51: { eorA(readIndY()); nCycles += 5; tailCallEmuInstr; }
+		case 0x52: { nCycles += 2; tailCallEmuInstr; }
+		case 0x53: { nCycles += 2; tailCallEmuInstr; }
+		case 0x54: { nCycles += 2; tailCallEmuInstr; }
+		case 0x55: { eorA(readZpgX()); nCycles += 4; tailCallEmuInstr; }
+		case 0x56: { rmwZpgX(shR); nCycles += 6; tailCallEmuInstr; }
+		case 0x57: { nCycles += 2; tailCallEmuInstr; }
+		case 0x58: { i = 0; nCycles += 2; tailCallEmuInstr; }
+		case 0x59: { eorA(readAbsY()); nCycles += 4; tailCallEmuInstr; }
+		case 0x5a: { nCycles += 2; tailCallEmuInstr; }
+		case 0x5b: { nCycles += 2; tailCallEmuInstr; }
+		case 0x5c: { nCycles += 2; tailCallEmuInstr; }
+		case 0x5d: { eorA(readAbsX()); nCycles += 4; tailCallEmuInstr; }
+		case 0x5e: { rmwAbsX(shR); nCycles += 7; tailCallEmuInstr; }
+		case 0x5f: { nCycles += 2; tailCallEmuInstr; }
+		case 0x60: { retSub(); nCycles += 6; tailCallEmuBBlock; }
+		case 0x61: { addA(readIndX()); nCycles += 6; tailCallEmuInstr; }
+		case 0x62: { nCycles += 2; tailCallEmuInstr; }
+		case 0x63: { nCycles += 2; tailCallEmuInstr; }
+		case 0x64: { nCycles += 2; tailCallEmuInstr; }
+		case 0x65: { addA(readZpg()); nCycles += 3; tailCallEmuInstr; }
+		case 0x66: { rmwZpg(roR); nCycles += 5; tailCallEmuInstr; }
+		case 0x67: { nCycles += 2; tailCallEmuInstr; }
+		case 0x68: { setA(pull()); nCycles += 4; tailCallEmuInstr; }
+		case 0x69: { addA(readImm()); nCycles += 2; tailCallEmuInstr; }
+		case 0x6a: { a = roR(a); nCycles += 2; tailCallEmuInstr; }
+		case 0x6b: { nCycles += 2; tailCallEmuInstr; }
+		case 0x6c: { jumpInd(); nCycles += 5; tailCallEmuBBlock; }
+		case 0x6d: { addA(readAbs()); nCycles += 4; tailCallEmuInstr; }
+		case 0x6e: { rmwAbs(roR); nCycles += 6; tailCallEmuInstr; }
+		case 0x6f: { nCycles += 2; tailCallEmuInstr; }
+		case 0x70: { nCycles += branch(v)? 3: 2; tailCallEmuBBlock; }
+		case 0x71: { addA(readIndY()); nCycles += 5; tailCallEmuInstr; }
+		case 0x72: { nCycles += 2; tailCallEmuInstr; }
+		case 0x73: { nCycles += 2; tailCallEmuInstr; }
+		case 0x74: { nCycles += 2; tailCallEmuInstr; }
+		case 0x75: { addA(readZpgX()); nCycles += 4; tailCallEmuInstr; }
+		case 0x76: { rmwZpgX(roR); nCycles += 6; tailCallEmuInstr; }
+		case 0x77: { nCycles += 2; tailCallEmuInstr; }
+		case 0x78: { i = 1; nCycles += 2; tailCallEmuInstr; }
+		case 0x79: { addA(readAbsY()); nCycles += 4; tailCallEmuInstr; }
+		case 0x7a: { nCycles += 2; tailCallEmuInstr; }
+		case 0x7b: { nCycles += 2; tailCallEmuInstr; }
+		case 0x7c: { nCycles += 2; tailCallEmuInstr; }
+		case 0x7d: { addA(readAbsX()); nCycles += 4; tailCallEmuInstr; }
+		case 0x7e: { rmwAbsX(roR); nCycles += 7; tailCallEmuInstr; }
+		case 0x7f: { nCycles += 2; tailCallEmuInstr; }
+		case 0x80: { nCycles += 2; tailCallEmuInstr; }
+		case 0x81: { writeIndX(a); nCycles += 6; tailCallEmuInstr; }
+		case 0x82: { nCycles += 2; tailCallEmuInstr; }
+		case 0x83: { nCycles += 2; tailCallEmuInstr; }
+		case 0x84: { writeZpg(y); nCycles += 3; tailCallEmuInstr; }
+		case 0x85: { writeZpg(a); nCycles += 3; tailCallEmuInstr; }
+		case 0x86: { writeZpg(x); nCycles += 3; tailCallEmuInstr; }
+		case 0x87: { nCycles += 2; tailCallEmuInstr; }
+		case 0x88: { setY(y - 1); nCycles += 2; tailCallEmuInstr; }
+		case 0x89: { nCycles += 2; tailCallEmuInstr; }
+		case 0x8a: { setA(x); nCycles += 2; tailCallEmuInstr; }
+		case 0x8b: { nCycles += 2; tailCallEmuInstr; }
+		case 0x8c: { writeAbs(y); nCycles += 4; tailCallEmuInstr; }
+		case 0x8d: { writeAbs(a); nCycles += 4; tailCallEmuInstr; }
+		case 0x8e: { writeAbs(x); nCycles += 4; tailCallEmuInstr; }
+		case 0x8f: { nCycles += 2; tailCallEmuInstr; }
+		case 0x90: { nCycles += branch(!c)? 3: 2; tailCallEmuBBlock; }
+		case 0x91: { writeIndY(a); nCycles += 6; tailCallEmuInstr; }
+		case 0x92: { nCycles += 2; tailCallEmuInstr; }
+		case 0x93: { nCycles += 2; tailCallEmuInstr; }
+		case 0x94: { writeZpgX(y); nCycles += 4; tailCallEmuInstr; }
+		case 0x95: { writeZpgX(a); nCycles += 4; tailCallEmuInstr; }
+		case 0x96: { writeZpgY(x); nCycles += 4; tailCallEmuInstr; }
+		case 0x97: { nCycles += 2; tailCallEmuInstr; }
+		case 0x98: { setA(y); nCycles += 2; tailCallEmuInstr; }
+		case 0x99: { writeAbsY(a); nCycles += 5; tailCallEmuInstr; }
+		case 0x9a: { spl = x; nCycles += 2; tailCallEmuInstr; }
+		case 0x9b: { nCycles += 2; tailCallEmuInstr; }
+		case 0x9c: { nCycles += 2; tailCallEmuInstr; }
+		case 0x9d: { writeAbsX(a); nCycles += 5; tailCallEmuInstr; }
+		case 0x9e: { nCycles += 2; tailCallEmuInstr; }
+		case 0x9f: { nCycles += 2; tailCallEmuInstr; }
+		case 0xa0: { setY(readImm()); nCycles += 2; tailCallEmuInstr; }
+		case 0xa1: { setA(readIndX()); nCycles += 6; tailCallEmuInstr; }
+		case 0xa2: { setX(readImm()); nCycles += 2; tailCallEmuInstr; }
+		case 0xa3: { nCycles += 2; tailCallEmuInstr; }
+		case 0xa4: { setY(readZpg()); nCycles += 3; tailCallEmuInstr; }
+		case 0xa5: { setA(readZpg()); nCycles += 3; tailCallEmuInstr; }
+		case 0xa6: { setX(readZpg()); nCycles += 3; tailCallEmuInstr; }
+		case 0xa7: { nCycles += 2; tailCallEmuInstr; }
+		case 0xa8: { setY(a); nCycles += 2; tailCallEmuInstr; }
+		case 0xa9: { setA(readImm()); nCycles += 2; tailCallEmuInstr; }
+		case 0xaa: { setX(a); nCycles += 2; tailCallEmuInstr; }
+		case 0xab: { nCycles += 2; tailCallEmuInstr; }
+		case 0xac: { setY(readAbs()); nCycles += 4; tailCallEmuInstr; }
+		case 0xad: { setA(readAbs()); nCycles += 4; tailCallEmuInstr; }
+		case 0xae: { setX(readAbs()); nCycles += 4; tailCallEmuInstr; }
+		case 0xaf: { nCycles += 2; tailCallEmuInstr; }
+		case 0xb0: { nCycles += branch(c)? 3: 2; tailCallEmuBBlock; }
+		case 0xb1: { setA(readIndY()); nCycles += 5; tailCallEmuInstr; }
+		case 0xb2: { nCycles += 2; tailCallEmuInstr; }
+		case 0xb3: { nCycles += 2; tailCallEmuInstr; }
+		case 0xb4: { setY(readZpgX()); nCycles += 4; tailCallEmuInstr; }
+		case 0xb5: { setA(readZpgX()); nCycles += 4; tailCallEmuInstr; }
+		case 0xb6: { setX(readZpgY()); nCycles += 4; tailCallEmuInstr; }
+		case 0xb7: { nCycles += 2; tailCallEmuInstr; }
+		case 0xb8: { v = 0; nCycles += 2; tailCallEmuInstr; }
+		case 0xb9: { setA(readAbsY()); nCycles += 4; tailCallEmuInstr; }
+		case 0xba: { setX(spl); nCycles += 2; tailCallEmuInstr; }
+		case 0xbb: { nCycles += 2; tailCallEmuInstr; }
+		case 0xbc: { setY(readAbsX()); nCycles += 4; tailCallEmuInstr; }
+		case 0xbd: { setA(readAbsX()); nCycles += 4; tailCallEmuInstr; }
+		case 0xbe: { setX(readAbsY()); nCycles += 4; tailCallEmuInstr; }
+		case 0xbf: { nCycles += 2; tailCallEmuInstr; }
+		case 0xc0: { cmpY(readImm()); nCycles += 2; tailCallEmuInstr; }
+		case 0xc1: { cmpA(readIndX()); nCycles += 6; tailCallEmuInstr; }
+		case 0xc2: { nCycles += 2; tailCallEmuInstr; }
+		case 0xc3: { nCycles += 2; tailCallEmuInstr; }
+		case 0xc4: { cmpY(readZpg()); nCycles += 3; tailCallEmuInstr; }
+		case 0xc5: { cmpA(readZpg()); nCycles += 3; tailCallEmuInstr; }
+		case 0xc6: { rmwZpg(dec); nCycles += 5; tailCallEmuInstr; }
+		case 0xc7: { nCycles += 2; tailCallEmuInstr; }
+		case 0xc8: { setY(y + 1); nCycles += 2; tailCallEmuInstr; }
+		case 0xc9: { cmpA(readImm()); nCycles += 2; tailCallEmuInstr; }
+		case 0xca: { setX(x - 1); nCycles += 2; tailCallEmuInstr; }
+		case 0xcb: { nCycles += 2; tailCallEmuInstr; }
+		case 0xcc: { cmpY(readAbs()); nCycles += 4; tailCallEmuInstr; }
+		case 0xcd: { cmpA(readAbs()); nCycles += 4; tailCallEmuInstr; }
+		case 0xce: { rmwAbs(dec); nCycles += 6; tailCallEmuInstr; }
+		case 0xcf: { nCycles += 2; tailCallEmuInstr; }
+		case 0xd0: { nCycles += branch(!z)? 3: 2; tailCallEmuBBlock; }
+		case 0xd1: { cmpA(readIndY()); nCycles += 5; tailCallEmuInstr; }
+		case 0xd2: { nCycles += 2; tailCallEmuInstr; }
+		case 0xd3: { nCycles += 2; tailCallEmuInstr; }
+		case 0xd4: { nCycles += 2; tailCallEmuInstr; }
+		case 0xd5: { cmpA(readZpgX()); nCycles += 4; tailCallEmuInstr; }
+		case 0xd6: { rmwZpgX(dec); nCycles += 6; tailCallEmuInstr; }
+		case 0xd7: { nCycles += 2; tailCallEmuInstr; }
+		case 0xd8: { d = 0; nCycles += 2; tailCallEmuInstr; }
+		case 0xd9: { cmpA(readAbsY()); nCycles += 4; tailCallEmuInstr; }
+		case 0xda: { nCycles += 2; tailCallEmuInstr; }
+		case 0xdb: { nCycles += 2; tailCallEmuInstr; }
+		case 0xdc: { nCycles += 2; tailCallEmuInstr; }
+		case 0xdd: { cmpA(readAbsX()); nCycles += 4; tailCallEmuInstr; }
+		case 0xde: { rmwAbsX(dec); nCycles += 7; tailCallEmuInstr; }
+		case 0xdf: { nCycles += 2; tailCallEmuInstr; }
+		case 0xe0: { cmpX(readImm()); nCycles += 2; tailCallEmuInstr; }
+		case 0xe1: { subA(readIndX()); nCycles += 6; tailCallEmuInstr; }
+		case 0xe2: { nCycles += 2; tailCallEmuInstr; }
+		case 0xe3: { nCycles += 2; tailCallEmuInstr; }
+		case 0xe4: { cmpX(readZpg()); nCycles += 3; tailCallEmuInstr; }
+		case 0xe5: { subA(readZpg()); nCycles += 3; tailCallEmuInstr; }
+		case 0xe6: { rmwZpg(inc); nCycles += 5; tailCallEmuInstr; }
+		case 0xe7: { nCycles += 2; tailCallEmuInstr; }
+		case 0xe8: { setX(x + 1); nCycles += 2; tailCallEmuInstr; }
+		case 0xe9: { subA(readImm()); nCycles += 2; tailCallEmuInstr; }
+		case 0xea: { nCycles += 2; tailCallEmuInstr; }
+		case 0xeb: { nCycles += 2; tailCallEmuInstr; }
+		case 0xec: { cmpX(readAbs()); nCycles += 4; tailCallEmuInstr; }
+		case 0xed: { subA(readAbs()); nCycles += 4; tailCallEmuInstr; }
+		case 0xee: { rmwAbs(inc); nCycles += 6; tailCallEmuInstr; }
+		case 0xef: { nCycles += 2; tailCallEmuInstr; }
+		case 0xf0: { nCycles += branch(z)? 3: 2; tailCallEmuBBlock; }
+		case 0xf1: { subA(readIndY()); nCycles += 5; tailCallEmuInstr; }
+		case 0xf2: { nCycles += 2; tailCallEmuInstr; }
+		case 0xf3: { nCycles += 2; tailCallEmuInstr; }
+		case 0xf4: { nCycles += 2; tailCallEmuInstr; }
+		case 0xf5: { subA(readZpgX()); nCycles += 4; tailCallEmuInstr; }
+		case 0xf6: { rmwZpgX(inc); nCycles += 6; tailCallEmuInstr; }
+		case 0xf7: { nCycles += 2; tailCallEmuInstr; }
+		case 0xf8: { d = 1; nCycles += 2; tailCallEmuInstr; }
+		case 0xf9: { subA(readAbsY()); nCycles += 4; tailCallEmuInstr; }
+		case 0xfa: { nCycles += 2; tailCallEmuInstr; }
+		case 0xfb: { nCycles += 2; tailCallEmuInstr; }
+		case 0xfc: { nCycles += 2; tailCallEmuInstr; }
+		case 0xfd: { subA(readAbsX()); nCycles += 4; tailCallEmuInstr; }
+		case 0xfe: { rmwAbsX(inc); nCycles += 7; tailCallEmuInstr; }
+		case 0xff: { nCycles += 2; tailCallEmuInstr; }
+		}
+		
+		#undef tailCallEmuInstr
 	}
 	
 	void emuBBlock() {
-		while (true) {
-			auto opcode = readImm();
-			
-			switch (opcode) {
-			case 0x00: { jumpInt(1); nCycles += 7; break; }
-			case 0x01: { orA(readIndX()); nCycles += 6; break; }
-			case 0x02: { nCycles += 2; break; }
-			case 0x03: { nCycles += 2; break; }
-			case 0x04: { nCycles += 2; break; }
-			case 0x05: { orA(readZpg()); nCycles += 3; break; }
-			case 0x06: { rmwZpg(shL); nCycles += 5; break; }
-			case 0x07: { nCycles += 2; break; }
-			case 0x08: { push(p(1)); nCycles += 3; break; }
-			case 0x09: { orA(readImm()); nCycles += 2; break; }
-			case 0x0a: { a = shL(a); nCycles += 2; break; }
-			case 0x0b: { nCycles += 2; break; }
-			case 0x0c: { nCycles += 2; break; }
-			case 0x0d: { orA(readAbs()); nCycles += 4; break; }
-			case 0x0e: { rmwAbs(shL); nCycles += 6; break; }
-			case 0x0f: { nCycles += 2; break; }
-			case 0x10: { nCycles += branch(!n)? 3: 2; break; }
-			case 0x11: { orA(readIndY()); nCycles += 5; break; }
-			case 0x12: { nCycles += 2; break; }
-			case 0x13: { nCycles += 2; break; }
-			case 0x14: { nCycles += 2; break; }
-			case 0x15: { orA(readZpgX()); nCycles += 4; break; }
-			case 0x16: { rmwZpgX(shL); nCycles += 6; break; }
-			case 0x17: { nCycles += 2; break; }
-			case 0x18: { c = 0; nCycles += 2; break; }
-			case 0x19: { orA(readAbsY()); nCycles += 4; break; }
-			case 0x1a: { nCycles += 2; break; }
-			case 0x1b: { nCycles += 2; break; }
-			case 0x1c: { nCycles += 2; break; }
-			case 0x1d: { orA(readAbsX()); nCycles += 4; break; }
-			case 0x1e: { rmwAbsX(shL); nCycles += 7; break; }
-			case 0x1f: { nCycles += 2; break; }
-			case 0x20: { jumpSub(); nCycles += 6; break; }
-			case 0x21: { andA(readIndX()); nCycles += 6; break; }
-			case 0x22: { nCycles += 2; break; }
-			case 0x23: { nCycles += 2; break; }
-			case 0x24: { bitA(readZpg()); nCycles += 3; break; }
-			case 0x25: { andA(readZpg()); nCycles += 3; break; }
-			case 0x26: { rmwZpg(roL); nCycles += 5; break; }
-			case 0x27: { nCycles += 2; break; }
-			case 0x28: { setP(pull()); nCycles += 4; break; }
-			case 0x29: { andA(readImm()); nCycles += 2; break; }
-			case 0x2a: { a = roL(a); nCycles += 2; break; }
-			case 0x2b: { nCycles += 2; break; }
-			case 0x2c: { bitA(readAbs()); nCycles += 4; break; }
-			case 0x2d: { andA(readAbs()); nCycles += 4; break; }
-			case 0x2e: { rmwAbs(roL); nCycles += 6; break; }
-			case 0x2f: { nCycles += 2; break; }
-			case 0x30: { nCycles += branch(n)? 3: 2; break; }
-			case 0x31: { andA(readIndY()); nCycles += 5; break; }
-			case 0x32: { nCycles += 2; break; }
-			case 0x33: { nCycles += 2; break; }
-			case 0x34: { nCycles += 2; break; }
-			case 0x35: { andA(readZpgX()); nCycles += 4; break; }
-			case 0x36: { rmwZpgX(roL); nCycles += 6; break; }
-			case 0x37: { nCycles += 2; break; }
-			case 0x38: { c = 1; nCycles += 2; break; }
-			case 0x39: { andA(readAbsY()); nCycles += 4; break; }
-			case 0x3a: { nCycles += 2; break; }
-			case 0x3b: { nCycles += 2; break; }
-			case 0x3c: { nCycles += 2; break; }
-			case 0x3d: { andA(readAbsX()); nCycles += 4; break; }
-			case 0x3e: { rmwAbsX(roL); nCycles += 7; break; }
-			case 0x3f: { nCycles += 2; break; }
-			case 0x40: { retInt(); nCycles += 6; break; }
-			case 0x41: { eorA(readIndX()); nCycles += 6; break; }
-			case 0x42: { nCycles += 2; break; }
-			case 0x43: { nCycles += 2; break; }
-			case 0x44: { nCycles += 2; break; }
-			case 0x45: { eorA(readZpg()); nCycles += 3; break; }
-			case 0x46: { rmwZpg(shR); nCycles += 5; break; }
-			case 0x47: { nCycles += 2; break; }
-			case 0x48: { push(a); nCycles += 3; break; }
-			case 0x49: { eorA(readImm()); nCycles += 2; break; }
-			case 0x4a: { a = shR(a); nCycles += 2; break; }
-			case 0x4b: { nCycles += 2; break; }
-			case 0x4c: { jumpAbs(); nCycles += 3; break; }
-			case 0x4d: { eorA(readAbs()); nCycles += 4; break; }
-			case 0x4e: { rmwAbs(shR); nCycles += 6; break; }
-			case 0x4f: { nCycles += 2; break; }
-			case 0x50: { nCycles += branch(!v)? 3: 2; break; }
-			case 0x51: { eorA(readIndY()); nCycles += 5; break; }
-			case 0x52: { nCycles += 2; break; }
-			case 0x53: { nCycles += 2; break; }
-			case 0x54: { nCycles += 2; break; }
-			case 0x55: { eorA(readZpgX()); nCycles += 4; break; }
-			case 0x56: { rmwZpgX(shR); nCycles += 6; break; }
-			case 0x57: { nCycles += 2; break; }
-			case 0x58: { i = 0; nCycles += 2; break; }
-			case 0x59: { eorA(readAbsY()); nCycles += 4; break; }
-			case 0x5a: { nCycles += 2; break; }
-			case 0x5b: { nCycles += 2; break; }
-			case 0x5c: { nCycles += 2; break; }
-			case 0x5d: { eorA(readAbsX()); nCycles += 4; break; }
-			case 0x5e: { rmwAbsX(shR); nCycles += 7; break; }
-			case 0x5f: { nCycles += 2; break; }
-			case 0x60: { retSub(); nCycles += 6; break; }
-			case 0x61: { addA(readIndX()); nCycles += 6; break; }
-			case 0x62: { nCycles += 2; break; }
-			case 0x63: { nCycles += 2; break; }
-			case 0x64: { nCycles += 2; break; }
-			case 0x65: { addA(readZpg()); nCycles += 3; break; }
-			case 0x66: { rmwZpg(roR); nCycles += 5; break; }
-			case 0x67: { nCycles += 2; break; }
-			case 0x68: { setA(pull()); nCycles += 4; break; }
-			case 0x69: { addA(readImm()); nCycles += 2; break; }
-			case 0x6a: { a = roR(a); nCycles += 2; break; }
-			case 0x6b: { nCycles += 2; break; }
-			case 0x6c: { jumpInd(); nCycles += 5; break; }
-			case 0x6d: { addA(readAbs()); nCycles += 4; break; }
-			case 0x6e: { rmwAbs(roR); nCycles += 6; break; }
-			case 0x6f: { nCycles += 2; break; }
-			case 0x70: { nCycles += branch(v)? 3: 2; break; }
-			case 0x71: { addA(readIndY()); nCycles += 5; break; }
-			case 0x72: { nCycles += 2; break; }
-			case 0x73: { nCycles += 2; break; }
-			case 0x74: { nCycles += 2; break; }
-			case 0x75: { addA(readZpgX()); nCycles += 4; break; }
-			case 0x76: { rmwZpgX(roR); nCycles += 6; break; }
-			case 0x77: { nCycles += 2; break; }
-			case 0x78: { i = 1; nCycles += 2; break; }
-			case 0x79: { addA(readAbsY()); nCycles += 4; break; }
-			case 0x7a: { nCycles += 2; break; }
-			case 0x7b: { nCycles += 2; break; }
-			case 0x7c: { nCycles += 2; break; }
-			case 0x7d: { addA(readAbsX()); nCycles += 4; break; }
-			case 0x7e: { rmwAbsX(roR); nCycles += 7; break; }
-			case 0x7f: { nCycles += 2; break; }
-			case 0x80: { nCycles += 2; break; }
-			case 0x81: { writeIndX(a); nCycles += 6; break; }
-			case 0x82: { nCycles += 2; break; }
-			case 0x83: { nCycles += 2; break; }
-			case 0x84: { writeZpg(y); nCycles += 3; break; }
-			case 0x85: { writeZpg(a); nCycles += 3; break; }
-			case 0x86: { writeZpg(x); nCycles += 3; break; }
-			case 0x87: { nCycles += 2; break; }
-			case 0x88: { setY(y - 1); nCycles += 2; break; }
-			case 0x89: { nCycles += 2; break; }
-			case 0x8a: { setA(x); nCycles += 2; break; }
-			case 0x8b: { nCycles += 2; break; }
-			case 0x8c: { writeAbs(y); nCycles += 4; break; }
-			case 0x8d: { writeAbs(a); nCycles += 4; break; }
-			case 0x8e: { writeAbs(x); nCycles += 4; break; }
-			case 0x8f: { nCycles += 2; break; }
-			case 0x90: { nCycles += branch(!c)? 3: 2; break; }
-			case 0x91: { writeIndY(a); nCycles += 6; break; }
-			case 0x92: { nCycles += 2; break; }
-			case 0x93: { nCycles += 2; break; }
-			case 0x94: { writeZpgX(y); nCycles += 4; break; }
-			case 0x95: { writeZpgX(a); nCycles += 4; break; }
-			case 0x96: { writeZpgY(x); nCycles += 4; break; }
-			case 0x97: { nCycles += 2; break; }
-			case 0x98: { setA(y); nCycles += 2; break; }
-			case 0x99: { writeAbsY(a); nCycles += 5; break; }
-			case 0x9a: { spl = x; nCycles += 2; break; }
-			case 0x9b: { nCycles += 2; break; }
-			case 0x9c: { nCycles += 2; break; }
-			case 0x9d: { writeAbsX(a); nCycles += 5; break; }
-			case 0x9e: { nCycles += 2; break; }
-			case 0x9f: { nCycles += 2; break; }
-			case 0xa0: { setY(readImm()); nCycles += 2; break; }
-			case 0xa1: { setA(readIndX()); nCycles += 6; break; }
-			case 0xa2: { setX(readImm()); nCycles += 2; break; }
-			case 0xa3: { nCycles += 2; break; }
-			case 0xa4: { setY(readZpg()); nCycles += 3; break; }
-			case 0xa5: { setA(readZpg()); nCycles += 3; break; }
-			case 0xa6: { setX(readZpg()); nCycles += 3; break; }
-			case 0xa7: { nCycles += 2; break; }
-			case 0xa8: { setY(a); nCycles += 2; break; }
-			case 0xa9: { setA(readImm()); nCycles += 2; break; }
-			case 0xaa: { setX(a); nCycles += 2; break; }
-			case 0xab: { nCycles += 2; break; }
-			case 0xac: { setY(readAbs()); nCycles += 4; break; }
-			case 0xad: { setA(readAbs()); nCycles += 4; break; }
-			case 0xae: { setX(readAbs()); nCycles += 4; break; }
-			case 0xaf: { nCycles += 2; break; }
-			case 0xb0: { nCycles += branch(c)? 3: 2; break; }
-			case 0xb1: { setA(readIndY()); nCycles += 5; break; }
-			case 0xb2: { nCycles += 2; break; }
-			case 0xb3: { nCycles += 2; break; }
-			case 0xb4: { setY(readZpgX()); nCycles += 4; break; }
-			case 0xb5: { setA(readZpgX()); nCycles += 4; break; }
-			case 0xb6: { setX(readZpgY()); nCycles += 4; break; }
-			case 0xb7: { nCycles += 2; break; }
-			case 0xb8: { v = 0; nCycles += 2; break; }
-			case 0xb9: { setA(readAbsY()); nCycles += 4; break; }
-			case 0xba: { setX(spl); nCycles += 2; break; }
-			case 0xbb: { nCycles += 2; break; }
-			case 0xbc: { setY(readAbsX()); nCycles += 4; break; }
-			case 0xbd: { setA(readAbsX()); nCycles += 4; break; }
-			case 0xbe: { setX(readAbsY()); nCycles += 4; break; }
-			case 0xbf: { nCycles += 2; break; }
-			case 0xc0: { cmpY(readImm()); nCycles += 2; break; }
-			case 0xc1: { cmpA(readIndX()); nCycles += 6; break; }
-			case 0xc2: { nCycles += 2; break; }
-			case 0xc3: { nCycles += 2; break; }
-			case 0xc4: { cmpY(readZpg()); nCycles += 3; break; }
-			case 0xc5: { cmpA(readZpg()); nCycles += 3; break; }
-			case 0xc6: { rmwZpg(dec); nCycles += 5; break; }
-			case 0xc7: { nCycles += 2; break; }
-			case 0xc8: { setY(y + 1); nCycles += 2; break; }
-			case 0xc9: { cmpA(readImm()); nCycles += 2; break; }
-			case 0xca: { setX(x - 1); nCycles += 2; break; }
-			case 0xcb: { nCycles += 2; break; }
-			case 0xcc: { cmpY(readAbs()); nCycles += 4; break; }
-			case 0xcd: { cmpA(readAbs()); nCycles += 4; break; }
-			case 0xce: { rmwAbs(dec); nCycles += 6; break; }
-			case 0xcf: { nCycles += 2; break; }
-			case 0xd0: { nCycles += branch(!z)? 3: 2; break; }
-			case 0xd1: { cmpA(readIndY()); nCycles += 5; break; }
-			case 0xd2: { nCycles += 2; break; }
-			case 0xd3: { nCycles += 2; break; }
-			case 0xd4: { nCycles += 2; break; }
-			case 0xd5: { cmpA(readZpgX()); nCycles += 4; break; }
-			case 0xd6: { rmwZpgX(dec); nCycles += 6; break; }
-			case 0xd7: { nCycles += 2; break; }
-			case 0xd8: { d = 0; nCycles += 2; break; }
-			case 0xd9: { cmpA(readAbsY()); nCycles += 4; break; }
-			case 0xda: { nCycles += 2; break; }
-			case 0xdb: { nCycles += 2; break; }
-			case 0xdc: { nCycles += 2; break; }
-			case 0xdd: { cmpA(readAbsX()); nCycles += 4; break; }
-			case 0xde: { rmwAbsX(dec); nCycles += 7; break; }
-			case 0xdf: { nCycles += 2; break; }
-			case 0xe0: { cmpX(readImm()); nCycles += 2; break; }
-			case 0xe1: { subA(readIndX()); nCycles += 6; break; }
-			case 0xe2: { nCycles += 2; break; }
-			case 0xe3: { nCycles += 2; break; }
-			case 0xe4: { cmpX(readZpg()); nCycles += 3; break; }
-			case 0xe5: { subA(readZpg()); nCycles += 3; break; }
-			case 0xe6: { rmwZpg(inc); nCycles += 5; break; }
-			case 0xe7: { nCycles += 2; break; }
-			case 0xe8: { setX(x + 1); nCycles += 2; break; }
-			case 0xe9: { subA(readImm()); nCycles += 2; break; }
-			case 0xea: { nCycles += 2; break; }
-			case 0xeb: { nCycles += 2; break; }
-			case 0xec: { cmpX(readAbs()); nCycles += 4; break; }
-			case 0xed: { subA(readAbs()); nCycles += 4; break; }
-			case 0xee: { rmwAbs(inc); nCycles += 6; break; }
-			case 0xef: { nCycles += 2; break; }
-			case 0xf0: { nCycles += branch(z)? 3: 2; break; }
-			case 0xf1: { subA(readIndY()); nCycles += 5; break; }
-			case 0xf2: { nCycles += 2; break; }
-			case 0xf3: { nCycles += 2; break; }
-			case 0xf4: { nCycles += 2; break; }
-			case 0xf5: { subA(readZpgX()); nCycles += 4; break; }
-			case 0xf6: { rmwZpgX(inc); nCycles += 6; break; }
-			case 0xf7: { nCycles += 2; break; }
-			case 0xf8: { d = 1; nCycles += 2; break; }
-			case 0xf9: { subA(readAbsY()); nCycles += 4; break; }
-			case 0xfa: { nCycles += 2; break; }
-			case 0xfb: { nCycles += 2; break; }
-			case 0xfc: { nCycles += 2; break; }
-			case 0xfd: { subA(readAbsX()); nCycles += 4; break; }
-			case 0xfe: { rmwAbsX(inc); nCycles += 7; break; }
-			case 0xff: { nCycles += 2; break; }
-			}
-			
-			if (
-				opcode == 0x00 ||
-				opcode == 0x10 ||
-				opcode == 0x20 ||
-				opcode == 0x30 ||
-				opcode == 0x40 ||
-				opcode == 0x4c ||
-				opcode == 0x50 ||
-				opcode == 0x60 ||
-				opcode == 0x6c ||
-				opcode == 0x70 ||
-				opcode == 0x90 ||
-				opcode == 0xB0 ||
-				opcode == 0xD0 ||
-				opcode == 0xF0
-			) {
-				break;
-			}
-		}
-		
 		Env::update(nCycles);
 		nCycles = 0;
 		
 		handleInt();
 		
-		__attribute__((musttail))
-		return emuBBlock();
+		if (pc == 0x8e04) {
+			a = shL(a);
+			setY(a);
+			setA(pull());
+			ram[0x04] = a;
+			setA(pull());
+			ram[0x05] = a;
+			setY(y + 1);
+			setA(read(read16Zpg(0x04) + y));
+			ram[0x06] = a;
+			setY(y + 1);
+			setA(read(read16Zpg(0x04) + y));
+			ram[0x07] = a;
+			pc = read16(0x06);
+			
+			nCycles += 43;
+			
+			__attribute__((musttail))
+			return emuBBlock();
+		} else {
+			__attribute__((musttail))
+			return emuInstr();
+		}
 	}
 	
 	void init() {
