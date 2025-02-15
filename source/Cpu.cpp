@@ -655,6 +655,7 @@ namespace Cpu {
 		case 0xff: { nCycles += 2; tailCallEmuInstr; }
 		}
 		
+		#undef tailCallEmuBBlock
 		#undef tailCallEmuInstr
 	}
 	
@@ -664,29 +665,8 @@ namespace Cpu {
 		
 		handleInt();
 		
-		if (pc == 0x8e04) {
-			a = shL(a);
-			setY(a);
-			setA(pull());
-			ram[0x04] = a;
-			setA(pull());
-			ram[0x05] = a;
-			setY(y + 1);
-			setA(read(read16Zpg(0x04) + y));
-			ram[0x06] = a;
-			setY(y + 1);
-			setA(read(read16Zpg(0x04) + y));
-			ram[0x07] = a;
-			pc = read16(0x06);
-			
-			nCycles += 43;
-			
-			__attribute__((musttail))
-			return emuBBlock();
-		} else {
-			__attribute__((musttail))
-			return emuInstr();
-		}
+		__attribute__((musttail))
+		return emuInstr();
 	}
 	
 	void init() {

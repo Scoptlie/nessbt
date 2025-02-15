@@ -393,7 +393,6 @@ namespace Ppu {
 				
 				glBindTexture(GL_TEXTURE_2D, frame);
 				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 240, 0, GL_RGB, GL_UNSIGNED_BYTE, colourBuf);
-				//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 240, 0, GL_RED, GL_UNSIGNED_BYTE, sprite0Buf);
 				
 				vblank = true;
 				if (nmiOnVblank) {
