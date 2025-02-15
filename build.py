@@ -150,8 +150,8 @@ cpp_compiler_args = [
 	'-std=c++23'
 ]
 c_cpp_compiler_args = [
-	#'-g',
-	'-O3',
+	'-g',
+	#'-O3',
 	'-Isource',
 	'-Ithirdparty/source',
 ]
