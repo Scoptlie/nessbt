@@ -1,5 +1,6 @@
 #include "ppu.h"
 
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -124,14 +125,18 @@ namespace Ppu {
 	
 	void write(U16 addr, U8 data) {
 		if (addr == regCtrl) {
+			auto prevBaseNtX = baseNtX;
+			auto prevBaseNtY = baseNtY;
 			baseNtX = data & 1;
 			baseNtY = (data >> 1) & 1;
+			if (baseNtX != prevBaseNtX || baseNtY != prevBaseNtY) {
+				reRender = true;
+			}
 			ppuAddrInc32 = (data >> 2) & 1;
 			spritesPtIdx = (data >> 3) & 1;
 			bgPtIdx = (data >> 4) & 1;
 			bigSprites = (data >> 5) & 1;
 			nmiOnVblank = data >> 7;
-			reRender = true;
 		} else if (addr == regMask) {
 			greyscale = data & 1;
 			bgVisibleLeft = (data >> 1) & 1;
@@ -139,12 +144,10 @@ namespace Ppu {
 			bgVisible = (data >> 3) & 1;
 			spritesVisible = (data >> 4) & 1;
 			emphasis = data >> 5;
-			reRender = true;
 		} else if (addr == regSpriteAddr) {
 			spriteAddr = data;
 		} else if (addr == regSpriteData) {
 			SpriteRam::write(spriteAddr++, data);
-			reRender = true;
 		} else if (addr == regScroll) {
 			ppuAddr = 0;
 			if (!secondWrite) {
@@ -165,7 +168,6 @@ namespace Ppu {
 				ppuAddr |= data;
 			}
 			secondWrite ^= 1;
-			reRender = true;
 		} else if (addr == regData) {
 			if (ppuAddr >= 0x2000 && ppuAddr <= 0x2fff) {
 				CiRam::write(ppuAddr & 0xfff, data);

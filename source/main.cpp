@@ -9,7 +9,7 @@
 
 int main() {
 	Interface::init();
-	Cart::init("roms/dk.nes");
+	Cart::init("roms/oopiesquest.nes");
 	Ppu::init();
 	Cpu::init();
 	
@@ -26,8 +26,8 @@ int main() {
 				Cpu::emuInstr();
 				while (Cpu::nCycles > 0) {
 					Ppu::tick();
-					//Ppu::tick();
-					//Ppu::tick();
+					Ppu::tick();
+					Ppu::tick();
 					Cpu::nCycles--;
 				}
 			}

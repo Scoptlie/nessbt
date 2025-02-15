@@ -1,4 +1,4 @@
-#include "CiRam.h"
+#include "ciRam.h"
 
 #include <cstring>
 
