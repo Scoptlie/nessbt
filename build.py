@@ -151,7 +151,6 @@ cpp_compiler_args = [
 ]
 c_cpp_compiler_args = [
 	'-g',
-	#'-O3',
 	'-Isource',
 	'-Ithirdparty/source',
 ]
@@ -166,17 +165,6 @@ linker_args = [
 
 compile_commands = []
 
-header_files_to_precompile = [
-	'thirdparty/source/GL/gl3w.h',
-	'thirdparty/source/glm/glm.hpp'
-]
-
-pch_files = []
-for file in header_files_to_precompile:
-	pch_file = 'gen/pch/'+file+'.pch'
-	gen_pch_file(pch_file, file)
-	pch_files.append(pch_file)
-
 source_dirs = ['source', 'thirdparty/source']
 
 source_files = [os.path.join(root, file)
@@ -188,7 +176,7 @@ source_files = [os.path.join(root, file)
 obj_files = []
 for file in source_files:
 	obj_file = 'gen/obj/'+file+'.o'
-	gen_obj_file(obj_file, file, pch_files)
+	gen_obj_file(obj_file, file, [])
 	obj_files.append(obj_file)
 
 gen_bin_file('gen/a.exe', obj_files)
