@@ -4,7 +4,7 @@ import os
 import subprocess
 
 palette_file = 'palettes/Pixeltao CRT.pal'
-rom_file = 'roms/hackmatch.nes'
+rom_file = 'roms/smb.nes'
 
 c_compiler = os.environ['C_COMPILER']
 cpp_compiler = os.environ['CPP_COMPILER']
@@ -138,7 +138,7 @@ def gen_obj_file(
 		'file': source_file
 	})
 	
-	info_file = 'gen/info/'+source_file+'.info'
+	info_file = 'gen/info/'+obj_file+'.info'
 	if is_up_to_date(obj_file, info_file, cmd):
 		return
 	

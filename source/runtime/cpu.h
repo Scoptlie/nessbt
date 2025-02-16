@@ -8,6 +8,8 @@ namespace Cpu {
 	extern U8 prgRom[0x8000];
 	extern USize prgRomSize;
 	
+	extern void (*stBBlockFuncs[0x8000])();
+	
 	extern USize nCycles;
 	
 	extern U8 n, v, d, i, z, c;
@@ -54,7 +56,7 @@ namespace Cpu {
 	
 	void handleInt();
 	
-	void emuBBlock();
+	void runBBlockDyn();
 	
 	void init();
 	
