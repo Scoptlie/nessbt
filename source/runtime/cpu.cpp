@@ -2,8 +2,6 @@
 
 #include <cstring>
 
-//#include "runtime/ppu/spriteRam.h"
-#include "runtime/cart.h"
 #include "runtime/controller.h"
 #include "runtime/env.h"
 #include "runtime/ppu.h"
@@ -152,7 +150,7 @@ namespace Cpu {
 		} else if (addr == 0x4016) {
 			return Controller::data();
 		} else if (addr >= 0x8000) {
-			return Cart::cpuRead(addr & 0x7fff);
+			return prgRom[(addr & 0x7fff) & (prgRomSize - 1)];
 		}
 		return 0;
 	}
@@ -162,7 +160,7 @@ namespace Cpu {
 	}
 	
 	U16 read16Zpg(U8 addr) {
-		return read(addr) | (read(U8(addr + 1)) << 8);
+		return ram[addr] | (ram[U8(addr + 1)] << 8);
 	}
 	
 	U8 readImm() {

@@ -3,6 +3,13 @@ import json
 import os
 import subprocess
 
+palette_file = 'palettes/Pixeltao CRT.pal'
+rom_file = 'roms/hackmatch.nes'
+
+c_compiler = os.environ['C_COMPILER']
+cpp_compiler = os.environ['CPP_COMPILER']
+linker = os.environ['LINKER']
+
 def is_up_to_date(
 	file: str,
 	info_file: str,
@@ -38,6 +45,75 @@ def gen_info_file(
 			'params': params,
 			'deps': deps
 		}, s)
+
+def gen_palette_cpp_file(
+	cpp_file: str,
+	palette_file: str
+):
+	info_file = 'gen/info/'+cpp_file+'.info'
+	if is_up_to_date(cpp_file, info_file, palette_file):
+		return
+	
+	palette = []
+	with open(palette_file, 'rb') as s:
+		for i in range(0, 64):
+			rgb = s.read(3)
+			palette.append(rgb)
+	
+	os.makedirs(os.path.dirname(cpp_file), exist_ok=True)
+	
+	print('\x1b[96m' + cpp_file + '\x1b[0m')
+	
+	with open(cpp_file, 'w') as s:
+		s.write(
+			'#include "runtime/ppu.h"\n'
+			'\n'
+			'namespace Ppu {\n'
+			'\tRgb globalPalette[0x40] = {\n'
+		)
+		
+		for rgb in palette:
+			s.write(f'\t\tRgb{{{rgb[0]}, {rgb[1]}, {rgb[2]}}},\n')
+		
+		s.write(
+			'\t};\n'
+			'}\n'
+		)
+	
+	gen_info_file(info_file, palette_file, [palette_file])
+
+def gen_rom_cpp_files(
+	prg_rom_cpp_file: str,
+	chr_rom_cpp_file: str,
+	rom_file: str
+):
+	prg_rom_info_file = 'gen/info/'+prg_rom_cpp_file+'.info'
+	chr_rom_info_file = 'gen/info/'+chr_rom_cpp_file+'.info'
+	if (
+		is_up_to_date(prg_rom_cpp_file, prg_rom_info_file, rom_file) and
+		is_up_to_date(chr_rom_cpp_file, chr_rom_info_file, rom_file)
+	):
+		return
+	
+	os.makedirs(os.path.dirname(prg_rom_cpp_file), exist_ok=True)
+	os.makedirs(os.path.dirname(chr_rom_cpp_file), exist_ok=True)
+	
+	print('\x1b[96m' + prg_rom_cpp_file + '\x1b[0m')
+	print('\x1b[96m' + chr_rom_cpp_file + '\x1b[0m')
+	
+	r = subprocess.run([
+		'go', 'run', './source/translator',
+		'-prgRomCpp', prg_rom_cpp_file,
+		'-chrRomCpp', chr_rom_cpp_file,
+		'-rom', rom_file
+	]).returncode
+	if r != 0:
+		exit(1)
+	
+	gen_info_file(prg_rom_info_file, rom_file, [rom_file])
+	gen_info_file(chr_rom_info_file, rom_file, [rom_file])
+	
+	pass
 
 def gen_obj_file(
 	obj_file: str,
@@ -99,28 +175,9 @@ def gen_obj_file(
 	print('\x1b[95m' + obj_file + '\x1b[0m')
 	r = subprocess.run(cmd).returncode
 	if r != 0:
-		exit(-1)
+		exit(1)
 	
 	gen_info_file(info_file, cmd, deps)
-
-def gen_pch_file(
-	pch_file: str,
-	header_file: str
-):
-	cmd = [cpp_compiler, '-o', pch_file, '-x', 'c++-header', header_file] + cpp_compiler_args + c_cpp_compiler_args
-	
-	info_file = 'gen/info/'+pch_file+'.info'
-	if is_up_to_date(pch_file, info_file, cmd):
-		return
-	
-	os.makedirs(os.path.dirname(pch_file), exist_ok=True)
-	
-	print('\x1b[93m' + pch_file + '\x1b[0m')
-	r = subprocess.run(cmd).returncode
-	if r != 0:
-		exit(-1)
-	
-	gen_info_file(info_file, cmd, [header_file])
 
 def gen_bin_file(
 	bin_file: str,
@@ -137,13 +194,18 @@ def gen_bin_file(
 	print('\x1b[95m' + bin_file + '\x1b[0m')
 	r = subprocess.run(cmd).returncode
 	if r != 0:
-		exit(-1)
+		exit(1)
 	
 	gen_info_file(info_file, cmd, obj_files)
 
-c_compiler = os.environ['C_COMPILER']
-cpp_compiler = os.environ['CPP_COMPILER']
-linker = os.environ['LINKER']
+palette_cpp_file = 'gen/source/runtime/ppu/globalPalette.cpp'
+
+gen_palette_cpp_file(palette_cpp_file, palette_file)
+
+prg_rom_cpp_file = 'gen/source/runtime/cpu/prgRom.cpp'
+chr_rom_cpp_file = 'gen/source/runtime/ppu/chrRom.cpp'
+
+gen_rom_cpp_files(prg_rom_cpp_file, chr_rom_cpp_file, rom_file)
 
 c_compiler_args = []
 cpp_compiler_args = [
@@ -171,7 +233,7 @@ source_files = [os.path.join(root, file)
 	for dir in source_dirs
 	for root, _, files in os.walk(dir)
 	for file in files if file.endswith(('.c', '.cpp'))
-]
+] + [palette_cpp_file, prg_rom_cpp_file, chr_rom_cpp_file]
 
 obj_files = []
 for file in source_files:

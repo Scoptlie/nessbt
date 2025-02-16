@@ -3,7 +3,6 @@
 #include <chrono>
 #include <thread>
 
-#include "runtime/cart.h"
 #include "runtime/controller.h"
 #include "runtime/interface.h"
 #include "runtime/ppu.h"
@@ -14,7 +13,6 @@ namespace Env {
 	void init() {
 		Interface::init();
 		Controller::init();
-		Cart::init("roms/tenebra2.nes");
 		Ppu::init();
 	}
 	

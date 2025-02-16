@@ -4,15 +4,12 @@
 
 #include <GL/gl3w.h>
 
-#include "runtime/ppu/globalPalette.h"
-#include "runtime/cart.h"
-
 namespace Ppu {
 	U8 ciRam[0x800];
 	
 	U16 ciRamAddr(U16 addr) {
 		auto lo = addr & 0b1111111111;
-		auto hi = (Cart::mirrorV? addr : (addr >> 1)) & 0b10000000000;
+		auto hi = (mirrorV? addr : (addr >> 1)) & 0b10000000000;
 		return lo | hi;
 	}
 	
@@ -103,7 +100,7 @@ namespace Ppu {
 		} else if (addr == regData) {
 			auto r = dataBuf;
 			if (ptr <= 0x1fff) {
-				dataBuf = Cart::ppuRead(ptr);
+				dataBuf = chrRom[ptr & (chrRomSize - 1)];
 			} else if (ptr <= 0x2fff) {
 				dataBuf = ciRam[ciRamAddr(ptr & 0xfff)];
 			}
@@ -207,8 +204,8 @@ namespace Ppu {
 				auto yPattern = (sprite.flipY? (h - 1 - ySprite) : ySprite) & 7;
 				
 				auto patternAddr = (0x1000 * ptIdx) + (0x10 * patternIdx);
-				auto patternLo = Cart::ppuRead(patternAddr + yPattern);
-				auto patternHi = Cart::ppuRead(patternAddr + 8 + yPattern);
+				auto patternLo = chrRom[(patternAddr + yPattern) & (chrRomSize - 1)];
+				auto patternHi = chrRom[(patternAddr + 8 + yPattern) & (chrRomSize - 1)];
 				
 				for (auto xSprite = 0; xSprite < 8; xSprite++) {
 					auto xS = sprite.x + xSprite;
@@ -293,8 +290,8 @@ namespace Ppu {
 					auto yS = y - scrollY;
 					
 					auto patternAddr = (0x1000 * bgPtIdx) + (0x10 * patternIdx);
-					auto patternLo = Cart::ppuRead(patternAddr + yTile);
-					auto patternHi = Cart::ppuRead(patternAddr + 8 + yTile);
+					auto patternLo = chrRom[(patternAddr + yTile) & (chrRomSize - 1)];
+					auto patternHi = chrRom[(patternAddr + 8 + yTile) & (chrRomSize - 1)];
 					
 					auto x = x0; do {
 						auto xTile = x % 8;

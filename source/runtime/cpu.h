@@ -5,6 +5,9 @@
 namespace Cpu {
 	extern U8 ram[0x800];
 	
+	extern U8 prgRom[0x8000];
+	extern USize prgRomSize;
+	
 	extern USize nCycles;
 	
 	extern U8 n, v, d, i, z, c;
