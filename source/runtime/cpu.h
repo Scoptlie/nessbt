@@ -48,11 +48,18 @@ namespace Cpu {
 	U16 read16(U16 addr);
 	U16 read16Zpg(U8 addr);
 	void write(U16 addr, U8 data);
+	void rmw(U16 addr, U8(*func)(U8));
 	
 	void push(U8 data);
 	void push16(U16 data);
 	U8 pull();
 	U16 pull16();
+	
+	void jumpInd(U16 addr);
+	void jumpSub(U16 addr);
+	void jumpInt(U8 b);
+	void retSub();
+	void retInt();
 	
 	void handleInt();
 	

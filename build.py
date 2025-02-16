@@ -4,7 +4,7 @@ import os
 import subprocess
 
 palette_file = 'palettes/Pixeltao CRT.pal'
-rom_file = 'roms/smb.nes'
+rom_file = 'roms/dk.nes'
 
 c_compiler = os.environ['C_COMPILER']
 cpp_compiler = os.environ['CPP_COMPILER']

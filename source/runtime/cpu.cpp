@@ -9,8 +9,6 @@
 namespace Cpu {
 	U8 ram[0x800];
 	
-	void (*stBBlockFuncs[0x8000])();
-	
 	USize nCycles;
 	
 	U8 n, v, d, i, z, c;
@@ -339,20 +337,14 @@ namespace Cpu {
 		return r;
 	}
 	
-	void jumpAbs() {
-		pc = readImm16();
+	void jumpInd(U16 addr) {
+		pc = read(addr);
+		pc |= read((addr & 0xff00) | ((addr + 1) & 0x00ff)) << 8;
 	}
 	
-	void jumpInd() {
-		auto ia = readImm16();
-		pc = read(ia);
-		pc |= read((ia & 0xff00) | ((ia + 1) & 0x00ff)) << 8;
-	}
-	
-	void jumpSub() {
-		auto ea = readImm16();
+	void jumpSub(U16 addr) {
 		push16(pc - 1);
-		pc = ea;
+		pc = addr;
 	}
 	
 	void jumpInt(U8 b) {
@@ -360,6 +352,7 @@ namespace Cpu {
 		push(p(b));
 		i = 1;
 		pc = read16(Ppu::nmi? 0xfffa : 0xfffe);
+		Ppu::nmi = false;
 	}
 	
 	void retSub() {
@@ -378,14 +371,6 @@ namespace Cpu {
 			return true;
 		}
 		return false;
-	}
-	
-	void handleInt() {
-		if (Ppu::nmi) {
-			jumpInt(0);
-			nCycles += 7;
-			Ppu::nmi = false;
-		}
 	}
 	
 	void emuInstr() {
@@ -424,7 +409,7 @@ namespace Cpu {
 		case 0x1d: { orA(readAbsX()); nCycles += 4; tailCall(emuInstr()); }
 		case 0x1e: { rmwAbsX(shL); nCycles += 7; tailCall(emuInstr()); }
 		case 0x1f: { nCycles += 2; tailCall(emuInstr()); }
-		case 0x20: { jumpSub(); nCycles += 6; tailCall(runBBlockDyn()); }
+		case 0x20: { jumpSub(readImm16()); nCycles += 6; tailCall(runBBlockDyn()); }
 		case 0x21: { andA(readIndX()); nCycles += 6; tailCall(emuInstr()); }
 		case 0x22: { nCycles += 2; tailCall(emuInstr()); }
 		case 0x23: { nCycles += 2; tailCall(emuInstr()); }
@@ -468,7 +453,7 @@ namespace Cpu {
 		case 0x49: { eorA(readImm()); nCycles += 2; tailCall(emuInstr()); }
 		case 0x4a: { a = shR(a); nCycles += 2; tailCall(emuInstr()); }
 		case 0x4b: { nCycles += 2; tailCall(emuInstr()); }
-		case 0x4c: { jumpAbs(); nCycles += 3; tailCall(runBBlockDyn()); }
+		case 0x4c: { pc = readImm16(); nCycles += 3; tailCall(runBBlockDyn()); }
 		case 0x4d: { eorA(readAbs()); nCycles += 4; tailCall(emuInstr()); }
 		case 0x4e: { rmwAbs(shR); nCycles += 6; tailCall(emuInstr()); }
 		case 0x4f: { nCycles += 2; tailCall(emuInstr()); }
@@ -500,7 +485,7 @@ namespace Cpu {
 		case 0x69: { addA(readImm()); nCycles += 2; tailCall(emuInstr()); }
 		case 0x6a: { a = roR(a); nCycles += 2; tailCall(emuInstr()); }
 		case 0x6b: { nCycles += 2; tailCall(emuInstr()); }
-		case 0x6c: { jumpInd(); nCycles += 5; tailCall(runBBlockDyn()); }
+		case 0x6c: { jumpInd(readImm16()); nCycles += 5; tailCall(runBBlockDyn()); }
 		case 0x6d: { addA(readAbs()); nCycles += 4; tailCall(emuInstr()); }
 		case 0x6e: { rmwAbs(roR); nCycles += 6; tailCall(emuInstr()); }
 		case 0x6f: { nCycles += 2; tailCall(emuInstr()); }
@@ -652,52 +637,25 @@ namespace Cpu {
 	}
 	
 	void runBBlockDyn() {
-		auto f = stBBlockFuncs[(pc & 0x7fff) & (prgRomSize - 1)];
+		auto f = stBBlockFuncs[pc & 0x7fff];
 		if (f) {
 			tailCall(f());
 		} else {
 			Env::update(nCycles);
 			nCycles = 0;
 			
-			handleInt();
+			if (Ppu::nmi) {
+				jumpInt(0);
+				nCycles += 7;
+				tailCall(runBBlockDyn());
+			}
 			
 			tailCall(emuInstr());
 		}
 	}
 	
-	void stBBlock8E04() {
-		Env::update(nCycles);
-		nCycles = 0;
-		
-		if (Ppu::nmi) {
-			Ppu::nmi = false;
-			jumpInt(0);
-			nCycles += 7;
-			tailCall(runBBlockDyn());
-		}
-		
-		a = shL(a);
-		setY(a);
-		setA(pull());
-		ram[0x04] = a;
-		setA(pull());
-		ram[0x05] = a;
-		setY(y + 1);
-		setA(read(read16Zpg(0x04) + y));
-		ram[0x06] = a;
-		setY(y + 1);
-		setA(read(read16Zpg(0x04) + y));
-		ram[0x07] = a;
-		pc = read16(0x06);
-
-		nCycles += 43;
-		tailCall(runBBlockDyn());
-	}
-	
 	void init() {
 		memset(ram, 0, sizeof(ram));
-		
-		stBBlockFuncs[0xe04] = stBBlock8E04;
 		
 		nCycles = 0;
 		
