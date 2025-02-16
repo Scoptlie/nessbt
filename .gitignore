@@ -6,4 +6,4 @@
 !thirdparty/**
 !.gitignore
 !build.py
-!imgui.ini
+!go.mod
