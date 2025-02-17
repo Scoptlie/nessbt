@@ -4,7 +4,7 @@ import os
 import subprocess
 
 palette_file = 'palettes/Pixeltao CRT.pal'
-rom_file = 'roms/dk.nes'
+rom_file = 'roms/smb.nes'
 
 c_compiler = os.environ['C_COMPILER']
 cpp_compiler = os.environ['CPP_COMPILER']
@@ -212,11 +212,13 @@ cpp_compiler_args = [
 	'-std=c++23'
 ]
 c_cpp_compiler_args = [
-	'-g',
+	'-O3', '-flto',
+	#'-g',
 	'-Isource',
 	'-Ithirdparty/source',
 ]
 linker_args = [
+	'-flto',
 	'-std=c++2a',
 	'-Lthirdparty/lib',
 	'-lSDL2main',

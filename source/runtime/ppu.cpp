@@ -348,8 +348,7 @@ namespace Ppu {
 	void tick() {
 		if (
 			shouldRender &&
-			nRow < 240 && nCol == 0 &&
-			(spritesVis || bgVis)
+			nRow < 240 && nCol == 0
 		) {
 			render();
 			

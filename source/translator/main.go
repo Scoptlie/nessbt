@@ -139,6 +139,11 @@ func main() {
 		fmt.Sprintf("\tUSize prgRomSize = %d;\n", len(prgRom)) +
 		"\t\n"
 
+	for addr := range bBlocks {
+		prgRomCpp += fmt.Sprintf("\tvoid stBBlock%.4X();\n", addr)
+	}
+	prgRomCpp += "\t\n"
+
 	for addr, bBlock := range bBlocks {
 		funcName := fmt.Sprintf("stBBlock%.4X", addr)
 
@@ -154,15 +159,100 @@ func main() {
 			"\t\t\n"
 
 		nCycles := 0
-		for _, inst := range bBlock {
+		for _, inst := range bBlock[:len(bBlock)-1] {
 			prgRomCpp += "\t\t" + inst.asCpp() + "\n"
+
 			nCycles += inst.op.nCycles
 		}
+		lastInst := bBlock[len(bBlock)-1]
+		nCycles += lastInst.op.nCycles
 
 		prgRomCpp += "\t\t\n" +
-			fmt.Sprintf("\t\tnCycles += %d;\n", nCycles) +
-			"\t\ttailCall(runBBlockDyn());\n" +
-			"\t}\n" +
+			fmt.Sprintf("\t\tnCycles += %d;\n", nCycles)
+
+		if lastInst.op.name == opNameJmp {
+			if lastInst.op.addrMode == addrModeAbs {
+				_, exists := bBlocks[lastInst.operand]
+
+				prgRomCpp += fmt.Sprintf("\t\tpc = 0x%x;\n", int(lastInst.operand))
+				if exists {
+					prgRomCpp += fmt.Sprintf("\t\ttailCall(stBBlock%.4X());\n", int(lastInst.operand))
+				} else {
+					prgRomCpp += "\t\ttailCall(runBBlockDyn());\n"
+				}
+			} else {
+				prgRomCpp += fmt.Sprintf("\t\tjumpInd(0x%x);\n", int(lastInst.operand)) +
+					"\t\ttailCall(runBBlockDyn());\n"
+			}
+		} else if lastInst.op.name == opNameJsr {
+			_, exists := bBlocks[lastInst.operand]
+
+			prgRomCpp += fmt.Sprintf("\t\tpc = 0x%x;\n", int(lastInst.addr+3)) +
+				fmt.Sprintf("\t\tjumpSub(0x%x);\n", int(lastInst.operand))
+			if exists {
+				prgRomCpp += fmt.Sprintf("\t\ttailCall(stBBlock%.4X());\n", int(lastInst.operand))
+			} else {
+				prgRomCpp += "\t\ttailCall(runBBlockDyn());\n"
+			}
+		} else if lastInst.op.name == opNameBrk {
+			prgRomCpp += fmt.Sprintf("\t\tpc = 0x%x;\n", int(lastInst.addr+2)) +
+				"\t\tjumpInt(1);\n" +
+				"\t\ttailCall(runBBlockDyn());\n"
+		} else if lastInst.op.name == opNameRts {
+			prgRomCpp += "\t\tretSub();\n" +
+				"\t\ttailCall(runBBlockDyn());\n"
+		} else if lastInst.op.name == opNameRti {
+			prgRomCpp += "\t\tretInt();\n" +
+				"\t\ttailCall(runBBlockDyn());\n"
+		} else if lastInst.op.addrMode == addrModeRel {
+			condCpp := "bad"
+			switch lastInst.op.name {
+			case opNameBcc:
+				condCpp = "!c"
+			case opNameBcs:
+				condCpp = "c"
+			case opNameBeq:
+				condCpp = "z"
+			case opNameBmi:
+				condCpp = "n"
+			case opNameBne:
+				condCpp = "!z"
+			case opNameBpl:
+				condCpp = "!n"
+			case opNameBvc:
+				condCpp = "!v"
+			case opNameBvs:
+				condCpp = "v"
+			}
+
+			addr1 := lastInst.addr + 2
+			addr2 := addr1 + lastInst.operand
+
+			_, exists1 := bBlocks[addr1]
+			_, exists2 := bBlocks[addr2]
+
+			prgRomCpp += "\t\tif (" + condCpp + ") {\n" +
+				"\t\t\tnCycles++;\n" +
+				fmt.Sprintf("\t\t\tpc = 0x%x;\n", int(addr2))
+			if exists2 {
+				prgRomCpp += fmt.Sprintf("\t\t\ttailCall(stBBlock%.4X());\n", int(addr2))
+			} else {
+				prgRomCpp += "\t\ttailCall(runBBlockDyn());\n"
+			}
+			prgRomCpp += "\t\t} else {\n" +
+				fmt.Sprintf("\t\t\tpc = 0x%x;\n", int(addr1))
+			if exists1 {
+				prgRomCpp += fmt.Sprintf("\t\t\ttailCall(stBBlock%.4X());\n", int(addr1))
+			} else {
+				prgRomCpp += "\t\ttailCall(runBBlockDyn());\n"
+			}
+			prgRomCpp += "\t\t}\n"
+
+		} else {
+			prgRomCpp += "bad"
+		}
+
+		prgRomCpp += "\t}\n" +
 			"\t\n"
 	}
 

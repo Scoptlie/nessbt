@@ -8,12 +8,18 @@
 #include "runtime/ppu.h"
 
 namespace Env {
-	auto nextFrame = 0ll;
+	long long profStart;
+	
+	long long nextFrame;
 	
 	void init() {
+		using namespace std::chrono;
+		
 		Interface::init();
 		Controller::init();
 		Ppu::init();
+		
+		profStart = duration_cast<microseconds>(high_resolution_clock::now().time_since_epoch()).count();
 	}
 	
 	void update(USize nCycles) {
@@ -25,6 +31,9 @@ namespace Env {
 				if (Ppu::frameDone) {
 					using namespace std::chrono;
 					
+					auto profEnd = duration_cast<microseconds>(high_resolution_clock::now().time_since_epoch()).count();
+					printf("%lld\n", profEnd - profStart);
+					
 					long long now;
 					do {
 						now = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
@@ -35,6 +44,8 @@ namespace Env {
 					
 					Interface::update();
 					Ppu::frameDone = false;
+					
+					profStart = duration_cast<microseconds>(high_resolution_clock::now().time_since_epoch()).count();
 				}
 			}
 			
