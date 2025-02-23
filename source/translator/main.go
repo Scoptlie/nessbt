@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sort"
 )
 
 func parseRom(romFile string) (mirrorV bool, prgRom []byte, chrRom []byte) {
@@ -144,7 +145,16 @@ func main() {
 	}
 	prgRomCpp += "\t\n"
 
-	for addr, bBlock := range bBlocks {
+	bBlockAddrs := make([]int, 0, len(bBlocks))
+	for addr := range bBlocks {
+		bBlockAddrs = append(bBlockAddrs, int(addr))
+	}
+
+	sort.Ints(bBlockAddrs)
+
+	for _, addr := range bBlockAddrs {
+		bBlock := bBlocks[uint16(addr)]
+
 		funcName := fmt.Sprintf("stBBlock%.4X", addr)
 
 		prgRomCpp += "\tvoid " + funcName + "() {\n" +
@@ -176,7 +186,7 @@ func main() {
 
 				prgRomCpp += fmt.Sprintf("\t\tpc = 0x%x;\n", int(lastInst.operand))
 				if exists {
-					prgRomCpp += fmt.Sprintf("\t\ttailCall(stBBlock%.4X());\n", int(lastInst.operand))
+					prgRomCpp += fmt.Sprintf("\t\tstBBlock%.4X();\n", int(lastInst.operand))
 				} else {
 					prgRomCpp += "\t\ttailCall(runBBlockDyn());\n"
 				}
@@ -190,7 +200,7 @@ func main() {
 			prgRomCpp += fmt.Sprintf("\t\tpc = 0x%x;\n", int(lastInst.addr+3)) +
 				fmt.Sprintf("\t\tjumpSub(0x%x);\n", int(lastInst.operand))
 			if exists {
-				prgRomCpp += fmt.Sprintf("\t\ttailCall(stBBlock%.4X());\n", int(lastInst.operand))
+				prgRomCpp += fmt.Sprintf("\t\tstBBlock%.4X();\n", int(lastInst.operand))
 			} else {
 				prgRomCpp += "\t\ttailCall(runBBlockDyn());\n"
 			}
@@ -235,14 +245,14 @@ func main() {
 				"\t\t\tnCycles++;\n" +
 				fmt.Sprintf("\t\t\tpc = 0x%x;\n", int(addr2))
 			if exists2 {
-				prgRomCpp += fmt.Sprintf("\t\t\ttailCall(stBBlock%.4X());\n", int(addr2))
+				prgRomCpp += fmt.Sprintf("\t\t\tstBBlock%.4X();\n", int(addr2))
 			} else {
 				prgRomCpp += "\t\ttailCall(runBBlockDyn());\n"
 			}
 			prgRomCpp += "\t\t} else {\n" +
 				fmt.Sprintf("\t\t\tpc = 0x%x;\n", int(addr1))
 			if exists1 {
-				prgRomCpp += fmt.Sprintf("\t\t\ttailCall(stBBlock%.4X());\n", int(addr1))
+				prgRomCpp += fmt.Sprintf("\t\t\tstBBlock%.4X();\n", int(addr1))
 			} else {
 				prgRomCpp += "\t\ttailCall(runBBlockDyn());\n"
 			}
