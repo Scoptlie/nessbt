@@ -92,9 +92,9 @@ namespace Interface {
 		};
 		
 		auto vertShader = createShader(GL_VERTEX_SHADER,
-			"#version 460\n"
-			"layout(location=0)in vec2 vUv;"
-			"out vec2 fUv;"
+			"#version 120\n"
+			"attribute vec2 vUv;"
+			"varying vec2 fUv;"
 			"void main(){"
 				"gl_Position=vec4((vUv*2.0-vec2(1.0,1.0))*vec2(1.0,-1.0),0.0,1.0);"
 				"fUv=vUv;"
@@ -102,12 +102,11 @@ namespace Interface {
 		);
 		
 		auto fragShader = createShader(GL_FRAGMENT_SHADER,
-			"#version 460\n"
-			"in vec2 fUv;"
-			"out vec4 oCol;"
+			"#version 120\n"
+			"varying vec2 fUv;"
 			"uniform sampler2D uTex;"
 			"void main(){"
-				"oCol=texture2D(uTex,fUv);"
+				"gl_FragColor=texture2D(uTex,fUv);"
 			"}"
 		);
 		

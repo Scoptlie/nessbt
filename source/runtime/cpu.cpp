@@ -1,10 +1,12 @@
 #include "cpu.h"
 
 #include <cstring>
+#include <cstdio>
 
 #include "runtime/controller.h"
 #include "runtime/env.h"
 #include "runtime/ppu.h"
+#include "runtime/profiler.h"
 
 namespace Cpu {
 	U8 ram[0x800];
@@ -146,6 +148,9 @@ namespace Cpu {
 		if (addr <= 0x1fff) {
 			return ram[addr];
 		} else if (addr <= 0x3fff) {
+			Env::update(nCycles);
+			nCycles = 0;
+			
 			return Ppu::read(addr & 7);
 		} else if (addr == 0x4016) {
 			return Controller::data();
@@ -219,6 +224,9 @@ namespace Cpu {
 		if (addr <= 0x1fff) {
 			ram[addr] = data;
 		} else if (addr <= 0x3fff) {
+			Env::update(nCycles);
+			nCycles = 0;
+			
 			Ppu::write(addr & 7, data);
 		} else if (addr == 0x4014) {
 			if (data < 8) {
@@ -637,21 +645,31 @@ namespace Cpu {
 	}
 	
 	void runBBlockDyn() {
+#ifdef onlyUseTranslations
+		tailCall(stBBlockFuncs[pc & 0x7fff]());
+#elif !defined(onlyUseEmulation)
 		auto f = stBBlockFuncs[pc & 0x7fff];
 		if (f) {
 			tailCall(f());
 		} else {
+#endif
+			Profiler::addJumpTarget(pc);
+			
 			Env::update(nCycles);
 			nCycles = 0;
 			
 			if (Ppu::nmi) {
+				Profiler::addNmiLocation(pc);
+				
 				jumpInt(0);
 				nCycles += 7;
 				tailCall(runBBlockDyn());
 			}
 			
 			tailCall(emuInstr());
+#if !defined(onlyUseEmulation) && !defined(onlyUseTranslations)
 		}
+#endif
 	}
 	
 	void init() {

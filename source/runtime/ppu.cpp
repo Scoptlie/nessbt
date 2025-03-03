@@ -4,6 +4,8 @@
 
 #include <GL/gl3w.h>
 
+#include "runtime/profiler.h"
+
 namespace Ppu {
 	U8 ciRam[0x800];
 	
@@ -350,7 +352,11 @@ namespace Ppu {
 			shouldRender &&
 			nRow < 240 && nCol == 0
 		) {
+			Profiler::beginRender();
+			
 			render();
+			
+			Profiler::endRender();
 			
 			shouldRender = false;
 		}

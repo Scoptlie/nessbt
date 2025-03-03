@@ -3,8 +3,18 @@ import json
 import os
 import subprocess
 
-palette_file = 'palettes/Pixeltao CRT.pal'
-rom_file = 'roms/smb.nes'
+palette_file = os.environ['PALETTE']
+rom_file = os.environ['ROM']
+
+input_nmi_locations = os.getenv('INPUT_NMI_LOCATIONS', '0') == '1'
+input_jump_targets = os.getenv('INPUT_JUMP_TARGETS', '0') == '1'
+output_nmi_locations = os.getenv('OUTPUT_NMI_LOCATIONS', '0') == '1'
+output_jump_targets = os.getenv('OUTPUT_JUMP_TARGETS', '0') == '1'
+output_frame_profiles = os.getenv('OUTPUT_FRAME_PROFILES', '0') == '1'
+only_use_emulation = os.getenv('ONLY_USE_EMULATION', '0') == '1'
+only_use_translations = os.getenv('ONLY_USE_TRANSLATIONS', '0') == '1'
+
+use_optimisations = os.getenv('USE_OPTIMISATIONS', '0') == '1'
 
 c_compiler = os.environ['C_COMPILER']
 cpp_compiler = os.environ['CPP_COMPILER']
@@ -85,13 +95,21 @@ def gen_palette_cpp_file(
 def gen_rom_cpp_files(
 	prg_rom_cpp_file: str,
 	chr_rom_cpp_file: str,
-	rom_file: str
+	rom_file: str,
+	nmi_locations_file: str | None,
+	jump_targets_file: str | None
 ):
+	params = {
+		"rom_file": rom_file,
+		"jump_targets_file": jump_targets_file,
+		"nmi_locations_file": nmi_locations_file
+	}
+	
 	prg_rom_info_file = 'gen/info/'+prg_rom_cpp_file+'.info'
 	chr_rom_info_file = 'gen/info/'+chr_rom_cpp_file+'.info'
 	if (
-		is_up_to_date(prg_rom_cpp_file, prg_rom_info_file, rom_file) and
-		is_up_to_date(chr_rom_cpp_file, chr_rom_info_file, rom_file)
+		is_up_to_date(prg_rom_cpp_file, prg_rom_info_file, params) and
+		is_up_to_date(chr_rom_cpp_file, chr_rom_info_file, params)
 	):
 		return
 	
@@ -101,17 +119,29 @@ def gen_rom_cpp_files(
 	print('\x1b[96m' + prg_rom_cpp_file + '\x1b[0m')
 	print('\x1b[96m' + chr_rom_cpp_file + '\x1b[0m')
 	
-	r = subprocess.run([
+	cmd = [
 		'go', 'run', './source/translator',
 		'-prgRomCpp', prg_rom_cpp_file,
 		'-chrRomCpp', chr_rom_cpp_file,
 		'-rom', rom_file
-	]).returncode
+	]
+	if nmi_locations_file != None:
+		cmd += ['-nmiLocations', nmi_locations_file]
+	if jump_targets_file != None:
+		cmd += ['-jumpTargets', jump_targets_file]
+	
+	r = subprocess.run(cmd).returncode
 	if r != 0:
 		exit(1)
 	
-	gen_info_file(prg_rom_info_file, rom_file, [rom_file])
-	gen_info_file(chr_rom_info_file, rom_file, [rom_file])
+	deps = [rom_file]
+	if nmi_locations_file != None:
+		deps += [nmi_locations_file]
+	if jump_targets_file != None:
+		deps += [jump_targets_file]
+	
+	gen_info_file(prg_rom_info_file, params, deps)
+	gen_info_file(chr_rom_info_file, params, deps)
 	
 	pass
 
@@ -204,28 +234,47 @@ gen_palette_cpp_file(palette_cpp_file, palette_file)
 
 prg_rom_cpp_file = 'gen/source/runtime/cpu/prgRom.cpp'
 chr_rom_cpp_file = 'gen/source/runtime/ppu/chrRom.cpp'
+jump_targets_file = 'gen/jumpTargets' if input_jump_targets else None
+nmi_locations_file = 'gen/nmiLocations' if input_nmi_locations else None
 
-gen_rom_cpp_files(prg_rom_cpp_file, chr_rom_cpp_file, rom_file)
+gen_rom_cpp_files(
+	prg_rom_cpp_file, chr_rom_cpp_file,
+	rom_file,
+	nmi_locations_file, jump_targets_file
+)
 
 c_compiler_args = []
 cpp_compiler_args = [
 	'-std=c++23'
 ]
 c_cpp_compiler_args = [
-	'-O3', '-flto',
-	#'-g',
+	'-g',
 	'-Isource',
 	'-Ithirdparty/source',
 ]
 linker_args = [
-	'-flto',
 	'-std=c++2a',
 	'-Lthirdparty/lib',
 	'-lSDL2main',
 	'-lSDL2',
-	'-lopengl32',
-	'-lopenal'
+	'-lopengl32'
 ]
+
+if output_nmi_locations:
+	c_cpp_compiler_args += ['-DoutputNmiLocations']
+if output_jump_targets:
+	c_cpp_compiler_args += ['-DoutputJumpTargets']
+if output_frame_profiles:
+	c_cpp_compiler_args += ['-DoutputFrameProfiles']
+if only_use_emulation:
+	c_cpp_compiler_args += ['-DonlyUseEmulation']
+if only_use_translations:
+	c_cpp_compiler_args += ['-DonlyUseTranslations']
+if use_optimisations:
+	c_cpp_compiler_args += ['-flto', '-O3']
+	linker_args += ['-flto', '-O3']
+else:
+	c_cpp_compiler_args += ['-O1']
 
 compile_commands = []
 

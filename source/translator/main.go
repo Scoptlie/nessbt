@@ -9,7 +9,7 @@ import (
 	"sort"
 )
 
-func parseRom(romFile string) (mirrorV bool, prgRom []byte, chrRom []byte) {
+func parseRomFile(romFile string) (mirrorV bool, prgRom []byte, chrRom []byte) {
 	buf, err := os.ReadFile(romFile)
 	if err != nil {
 		panic(err)
@@ -44,37 +44,57 @@ func parseRom(romFile string) (mirrorV bool, prgRom []byte, chrRom []byte) {
 	return
 }
 
-func findBBlocks(prgRom []uint8) map[uint16][]opInstT {
-	bBlockAddrs := make(map[uint16]bool)
+func parseAddrsFile(file string) []uint16 {
+	s, err := os.Open(file)
+	if err != nil {
+		panic(err)
+	}
+	defer s.Close()
+
+	r := make([]uint16, 0)
+	buf := [2]byte{}
+
+	for {
+		_, err := s.Read(buf[:])
+		if err != nil {
+			break
+		}
+
+		v := binary.LittleEndian.Uint16(buf[:])
+		r = append(r, v)
+	}
+
+	return r
+}
+
+func findBBlockAddrs(prgRom []uint8) []uint16 {
+	set := make(map[uint16]bool)
 	for i := range len(prgRom) - 1 {
 		v := prgRom[i : i+2]
-		/*if v[0] == 0x10 ||
-			v[0] == 0x30 ||
-			v[0] == 0x50 ||
-			v[0] == 0x70 ||
-			v[0] == 0x90 ||
-			v[0] == 0xb0 ||
-			v[0] == 0xd0 ||
-			v[0] == 0xf0 {
-
-			offs := uint16(int16(int8(v[1])))
-
-			addr := 0x8000 + uint16(i) + 2 + offs
-			if addr >= 0x8000 {
-				bBlockAddrs[addr] = true
-			}
-		}*/
-
 		addr := binary.LittleEndian.Uint16(v)
 		if addr >= 0x8000 {
-			bBlockAddrs[addr] = true
+			set[addr] = true
 		}
+	}
+	r := make([]uint16, 0)
+	for addr := range set {
+		if addr == 0 {
+			addr = 0
+		}
+		r = append(r, addr)
+	}
+	return r
+}
+
+func findBBlocks(addrs []uint16, prgRom []uint8) map[uint16][]opInstT {
+	if addrs == nil {
+		addrs = findBBlockAddrs(prgRom)
 	}
 
 	bBlocks := make(map[uint16][]opInstT)
-	for len(bBlockAddrs) > 0 {
-		newAddrs := make(map[uint16]bool)
-		for addr := range bBlockAddrs {
+	for len(addrs) > 0 {
+		newAddrs := make([]uint16, 0)
+		for _, addr := range addrs {
 			_, exists := bBlocks[addr]
 			if exists {
 				continue
@@ -89,27 +109,37 @@ func findBBlocks(prgRom []uint8) map[uint16][]opInstT {
 				if lastInst.op.addrMode == addrModeRel {
 					addr1 := lastInst.addr + 2
 					if addr1 >= 0x8000 {
-						newAddrs[addr1] = true
+						newAddrs = append(newAddrs, addr1)
 					}
 
 					addr2 := addr1 + lastInst.operand
 					if addr2 >= 0x8000 {
-						newAddrs[addr2] = true
+						newAddrs = append(newAddrs, addr2)
 					}
 				} else if lastInst.op.name == opNameBrk {
 					addr := lastInst.addr + 2
 					if addr >= 0x8000 {
-						newAddrs[addr] = true
+						newAddrs = append(newAddrs, addr)
 					}
 				} else if lastInst.op.name == opNameJsr {
-					addr := lastInst.addr + 3
+					addr1 := lastInst.operand
+					if addr1 >= 0x8000 {
+						newAddrs = append(newAddrs, addr1)
+					}
+					
+					addr2 := lastInst.addr + 3
+					if addr2 >= 0x8000 {
+						newAddrs = append(newAddrs, addr2)
+					}
+				} else if lastInst.op.name == opNameJmp && lastInst.op.addrMode == addrModeAbs {
+					addr := lastInst.operand
 					if addr >= 0x8000 {
-						newAddrs[addr] = true
+						newAddrs = append(newAddrs, addr)
 					}
 				}
 			}
 		}
-		bBlockAddrs = newAddrs
+		addrs = newAddrs
 	}
 
 	return bBlocks
@@ -119,17 +149,30 @@ func main() {
 	prgRomCppFile := flag.String("prgRomCpp", "", "PRG ROM .cpp file to generate")
 	chrRomCppFile := flag.String("chrRomCpp", "", "CHR ROM .cpp file to generate")
 	romFile := flag.String("rom", "", "ROM file to translate")
+	nmiLocationsFile := flag.String("nmiLocations", "", "Input NMI locations file")
+	jumpTargetsFile := flag.String("jumpTargets", "", "Input jump targets file")
 
 	flag.Parse()
 
-	mirrorV, prgRom, chrRom := parseRom(*romFile)
+	mirrorV, prgRom, chrRom := parseRomFile(*romFile)
 
-	bBlocks := findBBlocks(prgRom)
+	var nmiLocations []uint16
+	if len(*nmiLocationsFile) > 0 {
+		nmiLocations = parseAddrsFile(*nmiLocationsFile)
+	}
+
+	var jumpTargets []uint16
+	if len(*jumpTargetsFile) > 0 {
+		jumpTargets = parseAddrsFile(*jumpTargetsFile)
+	}
+
+	bBlocks := findBBlocks(jumpTargets, prgRom)
 
 	prgRomCpp := "#include \"runtime/cpu.h\"\n" +
 		"\n" +
 		"#include \"runtime/env.h\"\n" +
 		"#include \"runtime/ppu.h\"\n" +
+		"#include \"runtime/profiler.h\"\n" +
 		"\n" +
 		"namespace Cpu {\n" +
 		"\tU8 prgRom[0x8000] = {"
@@ -157,16 +200,31 @@ func main() {
 
 		funcName := fmt.Sprintf("stBBlock%.4X", addr)
 
+		checkInterrupts := len(nmiLocations) == 0
+		for _, nmiAddr := range nmiLocations {
+			if addr == int(nmiAddr) {
+				checkInterrupts = true
+				break
+			}
+		}
+
 		prgRomCpp += "\tvoid " + funcName + "() {\n" +
-			"\t\tEnv::update(nCycles);\n" +
-			"\t\tnCycles = 0;\n" +
-			"\t\t\n" +
-			"\t\tif (Ppu::nmi) {\n" +
-			"\t\t\tjumpInt(0);\n" +
-			"\t\t\tnCycles += 7;\n" +
-			"\t\t\ttailCall(runBBlockDyn());\n" +
-			"\t\t}\n" +
+			fmt.Sprintf("\t\tProfiler::addJumpTarget(0x%x);\n", addr) +
 			"\t\t\n"
+
+		if checkInterrupts {
+			prgRomCpp += "\t\tEnv::update(nCycles);\n" +
+				"\t\tnCycles = 0;\n" +
+				"\t\t\n" +
+				"\t\tif (Ppu::nmi) {\n" +
+				fmt.Sprintf("\t\t\tProfiler::addNmiLocation(0x%x);\n", addr) +
+				"\t\t\t\n" +
+				"\t\t\tjumpInt(0);\n" +
+				"\t\t\tnCycles += 7;\n" +
+				"\t\t\ttailCall(runBBlockDyn());\n" +
+				"\t\t}\n" +
+				"\t\t\n"
+		}
 
 		nCycles := 0
 		for _, inst := range bBlock[:len(bBlock)-1] {

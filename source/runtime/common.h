@@ -15,5 +15,10 @@ using I32 = int32_t;
 using I64 = int64_t;
 using ISize = ptrdiff_t;
 
-#define tailCall(x)\
-	__attribute__((musttail)) return x
+#ifdef __clang__
+	#define tailCall(x)\
+		__attribute__((musttail)) return x
+#else
+	#define tailCall(x)\
+		return x
+#endif
