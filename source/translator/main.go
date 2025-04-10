@@ -126,7 +126,7 @@ func findBBlocks(addrs []uint16, prgRom []uint8) map[uint16][]opInstT {
 					if addr1 >= 0x8000 {
 						newAddrs = append(newAddrs, addr1)
 					}
-					
+
 					addr2 := lastInst.addr + 3
 					if addr2 >= 0x8000 {
 						newAddrs = append(newAddrs, addr2)
@@ -276,21 +276,21 @@ func main() {
 			condCpp := "bad"
 			switch lastInst.op.name {
 			case opNameBcc:
-				condCpp = "!c"
+				condCpp = "!p.c"
 			case opNameBcs:
-				condCpp = "c"
+				condCpp = "p.c"
 			case opNameBeq:
-				condCpp = "z"
+				condCpp = "p.z"
 			case opNameBmi:
-				condCpp = "n"
+				condCpp = "p.n"
 			case opNameBne:
-				condCpp = "!z"
+				condCpp = "!p.z"
 			case opNameBpl:
-				condCpp = "!n"
+				condCpp = "!p.n"
 			case opNameBvc:
-				condCpp = "!v"
+				condCpp = "!p.v"
 			case opNameBvs:
-				condCpp = "v"
+				condCpp = "p.v"
 			}
 
 			addr1 := lastInst.addr + 2

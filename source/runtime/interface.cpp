@@ -15,9 +15,11 @@ namespace Interface {
 	SDL_Window *window;
 	SDL_GLContext glContext;
 	
-	unsigned program;
-	int programUTex;
-	unsigned vertArray, vertBuf;
+	U32 program;
+	I32 programUTex;
+	U32 vertArray, vertBuf;
+	
+	U32 frame;
 	
 	void update() {
 		SDL_Event event;
@@ -39,7 +41,8 @@ namespace Interface {
 		auto vpY = (winH - vpH) / 2;
 		glViewport(vpX, vpY, vpW, vpH);
 		
-		glBindTexture(GL_TEXTURE_2D, Ppu::frame);
+		glBindTexture(GL_TEXTURE_2D, frame);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 240, 0, GL_RGB, GL_UNSIGNED_BYTE, Ppu::colourBuf);
 		
 		glUseProgram(program);
 		glUniform1i(programUTex, 0);
@@ -64,6 +67,8 @@ namespace Interface {
 		);
 		
 		glContext = SDL_GL_CreateContext(window);
+		
+		SDL_GL_SetSwapInterval(0);
 		
 		gl3wInit();
 		
@@ -151,5 +156,13 @@ namespace Interface {
 		
 		glEnableVertexAttribArray(0);
 		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+		
+		glGenTextures(1, &frame);
+		glBindTexture(GL_TEXTURE_2D, frame);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 240, 0, GL_RGB, GL_UNSIGNED_BYTE, Ppu::colourBuf);
 	}
 }

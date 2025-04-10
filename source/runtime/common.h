@@ -15,6 +15,18 @@ using I32 = int32_t;
 using I64 = int64_t;
 using ISize = ptrdiff_t;
 
+#ifdef __GNUC__
+	#define alwaysInline\
+		__attribute__((always_inline)) inline
+	#define likely(x)\
+		__builtin_expect(!!(x), true)
+	#define unlikely(x)\
+		__builtin_expect(!!(x), false)
+#else
+	#define alwaysInline\
+		inline
+#endif
+
 #ifdef __clang__
 	#define tailCall(x)\
 		__attribute__((musttail)) return x

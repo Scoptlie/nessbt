@@ -37,6 +37,15 @@ namespace Env {
 		
 		Interface::update();
 		Ppu::frameDone = false;
+		
+		/*auto now = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+		if (now >= nextFrame) {
+			nextFrame = ((now / frameSep) + 1) * frameSep;
+			
+			Interface::update();
+		}
+		
+		Ppu::frameDone = false;*/
 	}
 	
 	void update(USize nCycles) {

@@ -12,11 +12,18 @@ namespace Cpu {
 	
 	extern USize nCycles;
 	
-	extern U8 n, v, d, i, z, c;
+	struct PT {
+		U8 c : 1,
+			z : 1,
+			i : 1,
+			d : 1,
+			b : 1,
+			one : 1,
+			v : 1,
+			n : 1;
+	};
 	
-	U8 p(U8 b);
-	void setP(U8 p);
-	void setNZ(U8 data);
+	extern PT p;
 	
 	extern U16 pc;
 	
@@ -54,6 +61,9 @@ namespace Cpu {
 	void push16(U16 data);
 	U8 pull();
 	U16 pull16();
+	
+	void pushP(U8 b);
+	void pullP();
 	
 	void jumpInd(U16 addr);
 	void jumpSub(U16 addr);

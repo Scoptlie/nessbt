@@ -13,32 +13,11 @@ namespace Cpu {
 	
 	USize nCycles;
 	
-	U8 n, v, d, i, z, c;
-	
-	U8 p(U8 b) {
-		return
-			(n << 7) |
-			(v << 6) |
-			(1 << 5) |
-			(b << 4) |
-			(d << 3) |
-			(i << 2) |
-			(z << 1) |
-			c;
-	}
-	
-	void setP(U8 p) {
-		n = (p >> 7) & 1;
-		v = (p >> 6) & 1;
-		d = (p >> 3) & 1;
-		i = (p >> 2) & 1;
-		z = (p >> 1) & 1;
-		c = p & 1;
-	}
+	PT p;
 	
 	void setNZ(U8 data) {
-		n = data >> 7;
-		z = data == 0;
+		p.n = data >> 7;
+		p.z = data == 0;
 	}
 	
 	U16 pc;
@@ -65,9 +44,9 @@ namespace Cpu {
 	}
 	
 	void addA(U8 data) {
-		auto r = a + data + c;
-		c = r > 255;
-		v = ((~(a ^ data) & (r ^ data)) >> 7) & 1;
+		auto r = a + data + p.c;
+		p.c = r > 255;
+		p.v = ((~(a ^ data) & (r ^ data)) >> 7) & 1;
 		setA(r);
 	}
 	
@@ -77,13 +56,13 @@ namespace Cpu {
 	
 	void cmpA(U8 data) {
 		setNZ(a - data);
-		c = a >= data;
+		p.c = a >= data;
 	}
 	
 	void bitA(U8 data) {
-		n = data >> 7;
-		v = (data >> 6) & 1;
-		z = (a & data) == 0;
+		p.n = data >> 7;
+		p.v = (data >> 6) & 1;
+		p.z = (a & data) == 0;
 	}
 	
 	void setX(U8 data) {
@@ -93,7 +72,7 @@ namespace Cpu {
 	
 	void cmpX(U8 data) {
 		setNZ(x - data);
-		c = x >= data;
+		p.c = x >= data;
 	}
 	
 	void setY(U8 data) {
@@ -103,7 +82,7 @@ namespace Cpu {
 	
 	void cmpY(U8 data) {
 		setNZ(y - data);
-		c = y >= data;
+		p.c = y >= data;
 	}
 	
 	U8 inc(U8 data) {
@@ -118,28 +97,28 @@ namespace Cpu {
 	
 	U8 shL(U8 data) {
 		auto r = data << 1;
-		c = data >> 7;
+		p.c = data >> 7;
 		setNZ(r);
 		return r;
 	}
 	
 	U8 shR(U8 data) {
 		auto r = data >> 1;
-		c = data & 1;
+		p.c = data & 1;
 		setNZ(r);
 		return r;
 	}
 	
 	U8 roL(U8 data) {
-		auto r = (data << 1) | c;
-		c = data >> 7;
+		auto r = (data << 1) | p.c;
+		p.c = data >> 7;
 		setNZ(r);
 		return r;
 	}
 	
 	U8 roR(U8 data) {
-		auto r = (data >> 1) | (c << 7);
-		c = data & 1;
+		auto r = (data >> 1) | (p.c << 7);
+		p.c = data & 1;
 		setNZ(r);
 		return r;
 	}
@@ -345,6 +324,19 @@ namespace Cpu {
 		return r;
 	}
 	
+	void pushP(U8 b) {
+		p.b = b;
+		push(*(U8*)&p);
+		p.b = 1;
+	}
+	
+	void pullP() {
+		auto data = pull();
+		p = *(PT*)&data;
+		p.one = 1;
+		p.b = 1;
+	}
+	
 	void jumpInd(U16 addr) {
 		pc = read(addr);
 		pc |= read((addr & 0xff00) | ((addr + 1) & 0x00ff)) << 8;
@@ -357,8 +349,8 @@ namespace Cpu {
 	
 	void jumpInt(U8 b) {
 		push16(pc + b);
-		push(p(b));
-		i = 1;
+		pushP(b);
+		p.i = 1;
 		pc = read16(Ppu::nmi? 0xfffa : 0xfffe);
 		Ppu::nmi = false;
 	}
@@ -368,7 +360,7 @@ namespace Cpu {
 	}
 	
 	void retInt() {
-		setP(pull());
+		pullP();
 		pc = pull16();
 	}
 	
@@ -393,7 +385,7 @@ namespace Cpu {
 		case 0x05: { orA(readZpg()); nCycles += 3; tailCall(emuInstr()); }
 		case 0x06: { rmwZpg(shL); nCycles += 5; tailCall(emuInstr()); }
 		case 0x07: { nCycles += 2; tailCall(emuInstr()); }
-		case 0x08: { push(p(1)); nCycles += 3; tailCall(emuInstr()); }
+		case 0x08: { pushP(1); nCycles += 3; tailCall(emuInstr()); }
 		case 0x09: { orA(readImm()); nCycles += 2; tailCall(emuInstr()); }
 		case 0x0a: { a = shL(a); nCycles += 2; tailCall(emuInstr()); }
 		case 0x0b: { nCycles += 2; tailCall(emuInstr()); }
@@ -401,7 +393,7 @@ namespace Cpu {
 		case 0x0d: { orA(readAbs()); nCycles += 4; tailCall(emuInstr()); }
 		case 0x0e: { rmwAbs(shL); nCycles += 6; tailCall(emuInstr()); }
 		case 0x0f: { nCycles += 2; tailCall(emuInstr()); }
-		case 0x10: { nCycles += branch(!n)? 3: 2; tailCall(runBBlockDyn()); }
+		case 0x10: { nCycles += branch(!p.n)? 3: 2; tailCall(runBBlockDyn()); }
 		case 0x11: { orA(readIndY()); nCycles += 5; tailCall(emuInstr()); }
 		case 0x12: { nCycles += 2; tailCall(emuInstr()); }
 		case 0x13: { nCycles += 2; tailCall(emuInstr()); }
@@ -409,7 +401,7 @@ namespace Cpu {
 		case 0x15: { orA(readZpgX()); nCycles += 4; tailCall(emuInstr()); }
 		case 0x16: { rmwZpgX(shL); nCycles += 6; tailCall(emuInstr()); }
 		case 0x17: { nCycles += 2; tailCall(emuInstr()); }
-		case 0x18: { c = 0; nCycles += 2; tailCall(emuInstr()); }
+		case 0x18: { p.c = 0; nCycles += 2; tailCall(emuInstr()); }
 		case 0x19: { orA(readAbsY()); nCycles += 4; tailCall(emuInstr()); }
 		case 0x1a: { nCycles += 2; tailCall(emuInstr()); }
 		case 0x1b: { nCycles += 2; tailCall(emuInstr()); }
@@ -425,7 +417,7 @@ namespace Cpu {
 		case 0x25: { andA(readZpg()); nCycles += 3; tailCall(emuInstr()); }
 		case 0x26: { rmwZpg(roL); nCycles += 5; tailCall(emuInstr()); }
 		case 0x27: { nCycles += 2; tailCall(emuInstr()); }
-		case 0x28: { setP(pull()); nCycles += 4; tailCall(emuInstr()); }
+		case 0x28: { pullP(); nCycles += 4; tailCall(emuInstr()); }
 		case 0x29: { andA(readImm()); nCycles += 2; tailCall(emuInstr()); }
 		case 0x2a: { a = roL(a); nCycles += 2; tailCall(emuInstr()); }
 		case 0x2b: { nCycles += 2; tailCall(emuInstr()); }
@@ -433,7 +425,7 @@ namespace Cpu {
 		case 0x2d: { andA(readAbs()); nCycles += 4; tailCall(emuInstr()); }
 		case 0x2e: { rmwAbs(roL); nCycles += 6; tailCall(emuInstr()); }
 		case 0x2f: { nCycles += 2; tailCall(emuInstr()); }
-		case 0x30: { nCycles += branch(n)? 3: 2; tailCall(runBBlockDyn()); }
+		case 0x30: { nCycles += branch(p.n)? 3: 2; tailCall(runBBlockDyn()); }
 		case 0x31: { andA(readIndY()); nCycles += 5; tailCall(emuInstr()); }
 		case 0x32: { nCycles += 2; tailCall(emuInstr()); }
 		case 0x33: { nCycles += 2; tailCall(emuInstr()); }
@@ -441,7 +433,7 @@ namespace Cpu {
 		case 0x35: { andA(readZpgX()); nCycles += 4; tailCall(emuInstr()); }
 		case 0x36: { rmwZpgX(roL); nCycles += 6; tailCall(emuInstr()); }
 		case 0x37: { nCycles += 2; tailCall(emuInstr()); }
-		case 0x38: { c = 1; nCycles += 2; tailCall(emuInstr()); }
+		case 0x38: { p.c = 1; nCycles += 2; tailCall(emuInstr()); }
 		case 0x39: { andA(readAbsY()); nCycles += 4; tailCall(emuInstr()); }
 		case 0x3a: { nCycles += 2; tailCall(emuInstr()); }
 		case 0x3b: { nCycles += 2; tailCall(emuInstr()); }
@@ -465,7 +457,7 @@ namespace Cpu {
 		case 0x4d: { eorA(readAbs()); nCycles += 4; tailCall(emuInstr()); }
 		case 0x4e: { rmwAbs(shR); nCycles += 6; tailCall(emuInstr()); }
 		case 0x4f: { nCycles += 2; tailCall(emuInstr()); }
-		case 0x50: { nCycles += branch(!v)? 3: 2; tailCall(runBBlockDyn()); }
+		case 0x50: { nCycles += branch(!p.v)? 3: 2; tailCall(runBBlockDyn()); }
 		case 0x51: { eorA(readIndY()); nCycles += 5; tailCall(emuInstr()); }
 		case 0x52: { nCycles += 2; tailCall(emuInstr()); }
 		case 0x53: { nCycles += 2; tailCall(emuInstr()); }
@@ -473,7 +465,7 @@ namespace Cpu {
 		case 0x55: { eorA(readZpgX()); nCycles += 4; tailCall(emuInstr()); }
 		case 0x56: { rmwZpgX(shR); nCycles += 6; tailCall(emuInstr()); }
 		case 0x57: { nCycles += 2; tailCall(emuInstr()); }
-		case 0x58: { i = 0; nCycles += 2; tailCall(emuInstr()); }
+		case 0x58: { p.i = 0; nCycles += 2; tailCall(emuInstr()); }
 		case 0x59: { eorA(readAbsY()); nCycles += 4; tailCall(emuInstr()); }
 		case 0x5a: { nCycles += 2; tailCall(emuInstr()); }
 		case 0x5b: { nCycles += 2; tailCall(emuInstr()); }
@@ -497,7 +489,7 @@ namespace Cpu {
 		case 0x6d: { addA(readAbs()); nCycles += 4; tailCall(emuInstr()); }
 		case 0x6e: { rmwAbs(roR); nCycles += 6; tailCall(emuInstr()); }
 		case 0x6f: { nCycles += 2; tailCall(emuInstr()); }
-		case 0x70: { nCycles += branch(v)? 3: 2; tailCall(runBBlockDyn()); }
+		case 0x70: { nCycles += branch(p.v)? 3: 2; tailCall(runBBlockDyn()); }
 		case 0x71: { addA(readIndY()); nCycles += 5; tailCall(emuInstr()); }
 		case 0x72: { nCycles += 2; tailCall(emuInstr()); }
 		case 0x73: { nCycles += 2; tailCall(emuInstr()); }
@@ -505,7 +497,7 @@ namespace Cpu {
 		case 0x75: { addA(readZpgX()); nCycles += 4; tailCall(emuInstr()); }
 		case 0x76: { rmwZpgX(roR); nCycles += 6; tailCall(emuInstr()); }
 		case 0x77: { nCycles += 2; tailCall(emuInstr()); }
-		case 0x78: { i = 1; nCycles += 2; tailCall(emuInstr()); }
+		case 0x78: { p.i = 1; nCycles += 2; tailCall(emuInstr()); }
 		case 0x79: { addA(readAbsY()); nCycles += 4; tailCall(emuInstr()); }
 		case 0x7a: { nCycles += 2; tailCall(emuInstr()); }
 		case 0x7b: { nCycles += 2; tailCall(emuInstr()); }
@@ -529,7 +521,7 @@ namespace Cpu {
 		case 0x8d: { writeAbs(a); nCycles += 4; tailCall(emuInstr()); }
 		case 0x8e: { writeAbs(x); nCycles += 4; tailCall(emuInstr()); }
 		case 0x8f: { nCycles += 2; tailCall(emuInstr()); }
-		case 0x90: { nCycles += branch(!c)? 3: 2; tailCall(runBBlockDyn()); }
+		case 0x90: { nCycles += branch(!p.c)? 3: 2; tailCall(runBBlockDyn()); }
 		case 0x91: { writeIndY(a); nCycles += 6; tailCall(emuInstr()); }
 		case 0x92: { nCycles += 2; tailCall(emuInstr()); }
 		case 0x93: { nCycles += 2; tailCall(emuInstr()); }
@@ -561,7 +553,7 @@ namespace Cpu {
 		case 0xad: { setA(readAbs()); nCycles += 4; tailCall(emuInstr()); }
 		case 0xae: { setX(readAbs()); nCycles += 4; tailCall(emuInstr()); }
 		case 0xaf: { nCycles += 2; tailCall(emuInstr()); }
-		case 0xb0: { nCycles += branch(c)? 3: 2; tailCall(runBBlockDyn()); }
+		case 0xb0: { nCycles += branch(p.c)? 3: 2; tailCall(runBBlockDyn()); }
 		case 0xb1: { setA(readIndY()); nCycles += 5; tailCall(emuInstr()); }
 		case 0xb2: { nCycles += 2; tailCall(emuInstr()); }
 		case 0xb3: { nCycles += 2; tailCall(emuInstr()); }
@@ -569,7 +561,7 @@ namespace Cpu {
 		case 0xb5: { setA(readZpgX()); nCycles += 4; tailCall(emuInstr()); }
 		case 0xb6: { setX(readZpgY()); nCycles += 4; tailCall(emuInstr()); }
 		case 0xb7: { nCycles += 2; tailCall(emuInstr()); }
-		case 0xb8: { v = 0; nCycles += 2; tailCall(emuInstr()); }
+		case 0xb8: { p.v = 0; nCycles += 2; tailCall(emuInstr()); }
 		case 0xb9: { setA(readAbsY()); nCycles += 4; tailCall(emuInstr()); }
 		case 0xba: { setX(spl); nCycles += 2; tailCall(emuInstr()); }
 		case 0xbb: { nCycles += 2; tailCall(emuInstr()); }
@@ -593,7 +585,7 @@ namespace Cpu {
 		case 0xcd: { cmpA(readAbs()); nCycles += 4; tailCall(emuInstr()); }
 		case 0xce: { rmwAbs(dec); nCycles += 6; tailCall(emuInstr()); }
 		case 0xcf: { nCycles += 2; tailCall(emuInstr()); }
-		case 0xd0: { nCycles += branch(!z)? 3: 2; tailCall(runBBlockDyn()); }
+		case 0xd0: { nCycles += branch(!p.z)? 3: 2; tailCall(runBBlockDyn()); }
 		case 0xd1: { cmpA(readIndY()); nCycles += 5; tailCall(emuInstr()); }
 		case 0xd2: { nCycles += 2; tailCall(emuInstr()); }
 		case 0xd3: { nCycles += 2; tailCall(emuInstr()); }
@@ -601,7 +593,7 @@ namespace Cpu {
 		case 0xd5: { cmpA(readZpgX()); nCycles += 4; tailCall(emuInstr()); }
 		case 0xd6: { rmwZpgX(dec); nCycles += 6; tailCall(emuInstr()); }
 		case 0xd7: { nCycles += 2; tailCall(emuInstr()); }
-		case 0xd8: { d = 0; nCycles += 2; tailCall(emuInstr()); }
+		case 0xd8: { p.d = 0; nCycles += 2; tailCall(emuInstr()); }
 		case 0xd9: { cmpA(readAbsY()); nCycles += 4; tailCall(emuInstr()); }
 		case 0xda: { nCycles += 2; tailCall(emuInstr()); }
 		case 0xdb: { nCycles += 2; tailCall(emuInstr()); }
@@ -625,7 +617,7 @@ namespace Cpu {
 		case 0xed: { subA(readAbs()); nCycles += 4; tailCall(emuInstr()); }
 		case 0xee: { rmwAbs(inc); nCycles += 6; tailCall(emuInstr()); }
 		case 0xef: { nCycles += 2; tailCall(emuInstr()); }
-		case 0xf0: { nCycles += branch(z)? 3: 2; tailCall(runBBlockDyn()); }
+		case 0xf0: { nCycles += branch(p.z)? 3: 2; tailCall(runBBlockDyn()); }
 		case 0xf1: { subA(readIndY()); nCycles += 5; tailCall(emuInstr()); }
 		case 0xf2: { nCycles += 2; tailCall(emuInstr()); }
 		case 0xf3: { nCycles += 2; tailCall(emuInstr()); }
@@ -633,7 +625,7 @@ namespace Cpu {
 		case 0xf5: { subA(readZpgX()); nCycles += 4; tailCall(emuInstr()); }
 		case 0xf6: { rmwZpgX(inc); nCycles += 6; tailCall(emuInstr()); }
 		case 0xf7: { nCycles += 2; tailCall(emuInstr()); }
-		case 0xf8: { d = 1; nCycles += 2; tailCall(emuInstr()); }
+		case 0xf8: { p.d = 1; nCycles += 2; tailCall(emuInstr()); }
 		case 0xf9: { subA(readAbsY()); nCycles += 4; tailCall(emuInstr()); }
 		case 0xfa: { nCycles += 2; tailCall(emuInstr()); }
 		case 0xfb: { nCycles += 2; tailCall(emuInstr()); }
@@ -679,12 +671,14 @@ namespace Cpu {
 		
 		pc = read16(0xfffc);
 		spl = 0xfd;
-		n = 0;
-		v = 0;
-		d = 0;
-		i = 1;
-		z = 0;
-		c = 0;
+		p.n = 0;
+		p.v = 0;
+		p.one = 1;
+		p.b = 1;
+		p.d = 0;
+		p.i = 1;
+		p.z = 0;
+		p.c = 0;
 		a = 0;
 		x = 0;
 		y = 0;

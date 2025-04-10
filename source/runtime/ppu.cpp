@@ -51,7 +51,6 @@ namespace Ppu {
 	U8 pflagsBuf[256 * 240];
 	
 	bool frameDone;
-	U32 frame;
 	
 	bool nmi;
 	
@@ -373,9 +372,6 @@ namespace Ppu {
 			if (nRow == 240) {
 				frameDone = true;
 				
-				glBindTexture(GL_TEXTURE_2D, frame);
-				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 240, 0, GL_RGB, GL_UNSIGNED_BYTE, colourBuf);
-				
 				vblank = true;
 				if (nmiOnVblank) {
 					nmi = true;
@@ -402,14 +398,6 @@ namespace Ppu {
 	}
 	
 	void init() {
-		glGenTextures(1, &frame);
-		glBindTexture(GL_TEXTURE_2D, frame);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 240, 0, GL_RGB, GL_UNSIGNED_BYTE, colourBuf);
-		
 		sprite0Row = 0xffff;
 		sprite0Col = 0xffff;
 		

@@ -16,8 +16,9 @@ namespace Ppu {
 	
 	extern U8 spriteRam[0x100];
 	
+	extern Rgb colourBuf[256 * 240];
+	
 	extern bool frameDone;
-	extern U32 frame;
 	
 	extern bool nmi;
 	

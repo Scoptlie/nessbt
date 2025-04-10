@@ -422,13 +422,13 @@ func (inst opInstT) asCpp() string {
 		case opNameAsl:
 			return "a = shL(a);"
 		case opNameClc:
-			return "c = 0;"
+			return "p.c = 0;"
 		case opNameCld:
-			return "d = 0;"
+			return "p.d = 0;"
 		case opNameCli:
-			return "i = 0;"
+			return "p.i = 0;"
 		case opNameClv:
-			return "v = 0;"
+			return "p.v = 0;"
 		case opNameDex:
 			return "setX(x - 1);"
 		case opNameDey:
@@ -444,11 +444,11 @@ func (inst opInstT) asCpp() string {
 		case opNamePha:
 			return "push(a);"
 		case opNamePhp:
-			return "push(p(1));"
+			return "pushP(1);"
 		case opNamePla:
 			return "setA(pull());"
 		case opNamePlp:
-			return "setP(pull());"
+			return "pullP();"
 		case opNameRol:
 			return "a = roL(a);"
 		case opNameRor:
@@ -458,11 +458,11 @@ func (inst opInstT) asCpp() string {
 		case opNameRts:
 			return "retSub();"
 		case opNameSec:
-			return "c = 1;"
+			return "p.c = 1;"
 		case opNameSed:
-			return "d = 1;"
+			return "p.d = 1;"
 		case opNameSei:
-			return "i = 1;"
+			return "p.i = 1;"
 		case opNameTax:
 			return "setX(a);"
 		case opNameTay:
@@ -559,21 +559,21 @@ func (inst opInstT) asCpp() string {
 		condCpp := "bad"
 		switch inst.op.name {
 		case opNameBcc:
-			condCpp = "!c"
+			condCpp = "!p.c"
 		case opNameBcs:
-			condCpp = "c"
+			condCpp = "p.c"
 		case opNameBeq:
-			condCpp = "z"
+			condCpp = "p.z"
 		case opNameBmi:
-			condCpp = "n"
+			condCpp = "p.n"
 		case opNameBne:
-			condCpp = "!z"
+			condCpp = "!p.z"
 		case opNameBpl:
-			condCpp = "!n"
+			condCpp = "!p.n"
 		case opNameBvc:
-			condCpp = "!v"
+			condCpp = "!p.v"
 		case opNameBvs:
-			condCpp = "v"
+			condCpp = "p.v"
 		}
 
 		return fmt.Sprintf("if (%s) { pc = 0x%x; } else { pc = 0x%x; }",

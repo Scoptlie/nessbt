@@ -13,8 +13,10 @@ output_jump_targets = os.getenv('OUTPUT_JUMP_TARGETS', '0') == '1'
 output_frame_profiles = os.getenv('OUTPUT_FRAME_PROFILES', '0') == '1'
 only_use_emulation = os.getenv('ONLY_USE_EMULATION', '0') == '1'
 only_use_translations = os.getenv('ONLY_USE_TRANSLATIONS', '0') == '1'
+dedicate_registers = os.getenv('DEDICATE_REGISTERS', '0') == '1'
 
 use_optimisations = os.getenv('USE_OPTIMISATIONS', '0') == '1'
+use_unity_build = os.getenv('USE_UNITY_BUILD', '0') == '1'
 
 c_compiler = os.environ['C_COMPILER']
 cpp_compiler = os.environ['CPP_COMPILER']
@@ -145,6 +147,25 @@ def gen_rom_cpp_files(
 	
 	pass
 
+def gen_unity_source_file(
+	unity_source_file: str,
+	source_files: list[str]
+):
+	unity_info_file = 'gen/info/'+unity_source_file+'.info'
+	
+	if is_up_to_date(unity_source_file, unity_info_file, source_files):
+		return
+	
+	os.makedirs(os.path.dirname(unity_source_file), exist_ok=True)
+	
+	print('\x1b[96m' + unity_source_file + '\x1b[0m')
+	
+	with open(unity_source_file, 'w') as s:
+		for source_file in source_files:
+			s.write("#include \""+os.path.abspath(source_file).replace('\\', '/')+"\"\n")
+	
+	gen_info_file(unity_info_file, source_files, source_files)
+
 def gen_obj_file(
 	obj_file: str,
 	source_file: str,
@@ -251,6 +272,7 @@ c_cpp_compiler_args = [
 	'-g',
 	'-Isource',
 	'-Ithirdparty/source',
+	'-DSDL_MAIN_HANDLED'
 ]
 linker_args = [
 	'-std=c++2a',
@@ -270,9 +292,15 @@ if only_use_emulation:
 	c_cpp_compiler_args += ['-DonlyUseEmulation']
 if only_use_translations:
 	c_cpp_compiler_args += ['-DonlyUseTranslations']
+if dedicate_registers:
+	c_cpp_compiler_args += ['-DdedicateRegisters']
+	#c_cpp_compiler_args += ['-ffixed-rax']
 if use_optimisations:
-	c_cpp_compiler_args += ['-flto', '-O3']
-	linker_args += ['-flto', '-O3']
+	if use_unity_build:
+		c_cpp_compiler_args += ['-O3']
+	else:
+		c_cpp_compiler_args += ['-flto', '-O3']
+		linker_args += ['-flto', '-O3']
 else:
 	c_cpp_compiler_args += ['-O1']
 
@@ -286,13 +314,21 @@ source_files = [os.path.join(root, file)
 	for file in files if file.endswith(('.c', '.cpp'))
 ] + [palette_cpp_file, prg_rom_cpp_file, chr_rom_cpp_file]
 
-obj_files = []
-for file in source_files:
-	obj_file = 'gen/obj/'+file+'.o'
-	gen_obj_file(obj_file, file, [])
-	obj_files.append(obj_file)
-
-gen_bin_file('gen/a.exe', obj_files)
+if use_unity_build:
+	cpp_file = 'gen/source/all.cpp'
+	gen_unity_source_file(cpp_file, source_files)
+	obj_file = 'gen/obj/all.o'
+	gen_obj_file(obj_file, cpp_file, [])
+	bin_file = 'gen/a.exe'
+	gen_bin_file(bin_file, [obj_file])
+else:
+	obj_files = []
+	for file in source_files:
+		obj_file = 'gen/obj/'+file+'.o'
+		gen_obj_file(obj_file, file, [])
+		obj_files.append(obj_file)
+	
+	gen_bin_file('gen/a.exe', obj_files)
 
 with open('gen/compile_commands.json', 'w') as s:
 	json.dump(compile_commands, s)
